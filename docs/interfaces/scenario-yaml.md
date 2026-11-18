@@ -21,7 +21,7 @@ All fields below are required. The validator rejects unknown fields and duplicat
 
 Publishers with the same type and socket address are duplicates even if their rates differ or the addresses use different equivalent IPv6 spellings. Use distinct destinations for multiple DIS publishers.
 
-See the [repository example](../../config/scenarios/example.yaml) for a standalone scenario, and the [external clock fixture](../../crates/hoth-config/tests/fixtures/external-clock.yaml) for flow mappings and multiple destinations. The clock mode selects the intended authority. External clock transport and control behavior are defined by the clock interface work.
+See the [repository example](../../config/scenarios/example.yaml) for a standalone scenario, and the [external clock fixture](../../crates/hoth-config/tests/fixtures/external-clock.yaml) for flow mappings and multiple destinations. The clock mode selects the authority. The standalone clock uses the configured rate. External ticks specify exact UTC independently of the configured rate. See [ADR 0003](../decisions/0003-clock-and-publisher-ports.md).
 
 ## Radar field-of-view extension
 

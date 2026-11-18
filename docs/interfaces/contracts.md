@@ -16,10 +16,18 @@ The [canonical JSON fixture](../../crates/hoth-domain/tests/fixtures/satellite-s
 
 `hoth_config::ScenarioConfig::from_yaml` parses and validates the versioned configuration used for scenario preparation. See the [v1 fields and validation rules](scenario-yaml.md).
 
+## Simulation clock
+
+`hoth_clock::SimulationClock` returns the current `SimulationUtc`, authority mode, pause state, and standalone rate. Callers apply ordered `ClockEvent` values for pause, resume, seek, standalone rate changes, and externally supplied ticks. Consumers can sample a clock through a trait object. Propagation uses the reported absolute UTC so a seek can reproduce a previous state from the same inputs. See [ADR 0003](../decisions/0003-clock-and-publisher-ports.md).
+
+## Publisher
+
+`hoth_publisher::Publisher` provides synchronous initialization, batch submission, flush, and shutdown. The caller supplies one absolute UTC and an ordered slice of canonical states for that instant. Publishers preserve the slice order. The runner can pass the same slice to multiple publishers and can submit earlier timestamps after a seek.
+
+Initialize each instance once before submitting or flushing. Success on submission acknowledges local acceptance, which may include bounded queuing. Backpressure means the entire batch was rejected and is safe to retry before submitting newer work. A sink failure may leave delivery partial or unknown and ends submissions to that instance. Flush drains accepted work to the sink. Shutdown releases resources, drops pending work, and can be called again. See [ADR 0003](../decisions/0003-clock-and-publisher-ports.md).
+
 ## Planned interfaces
 
 - OrbitalElement: original OMM/TLE record, actual epoch, source, acquisition time, checksum.
 - ScenarioManifest: schema version; scenario clock policy; catalog snapshot and source records; fixed selected NORAD IDs; deterministic DIS Entity ID/type mapping; FOV selection metadata and provenance.
-- SimulationClock: current absolute simulation UTC, rate, paused/running state, seek/replay events; external source adapter optional.
-- Publisher: initialize, publish batch of canonical states at a simulation timestamp, flush/shutdown, report failures and backpressure.
 - Frame conversions: TEME to ECEF with Earth-rotation velocity term; all frame assumptions explicit.

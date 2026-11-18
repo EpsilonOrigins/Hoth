@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["apps/hoth-cli", "crates/hoth-config", "crates/hoth-domain"]
+members = [
+    "apps/hoth-cli",
+    "crates/hoth-clock",
+    "crates/hoth-config",
+    "crates/hoth-domain",
+    "crates/hoth-publisher",
+]
 
 [workspace.package]
 edition = "2021"
