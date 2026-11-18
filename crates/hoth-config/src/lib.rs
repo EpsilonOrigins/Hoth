@@ -1,5 +1,6 @@
 //! Offline parsing and validation for HOTH scenario YAML.
 
+pub use hoth_domain::clock::ClockMode;
 use hoth_domain::state::SimulationUtc;
 use serde::{de::Error as _, Deserialize, Deserializer};
 use std::{collections::HashMap, error::Error, fmt, net::SocketAddr, num::NonZeroU64};
@@ -70,13 +71,6 @@ pub struct ScenarioTime {
     pub clock: ClockMode,
     #[serde(deserialize_with = "deserialize_positive_rate")]
     pub rate: f64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ClockMode {
-    Standalone,
-    External,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

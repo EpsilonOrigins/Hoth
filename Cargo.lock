@@ -35,6 +35,13 @@ name = "hoth"
 version = "0.1.0"
 
 [[package]]
+name = "hoth-clock"
+version = "0.1.0"
+dependencies = [
+ "hoth-domain",
+]
+
+[[package]]
 name = "hoth-config"
 version = "0.1.0"
 dependencies = [
@@ -50,6 +57,14 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "hoth-publisher"
+version = "0.1.0"
+dependencies = [
+ "hoth-domain",
  "serde_json",
 ]
 

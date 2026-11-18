@@ -1,0 +1,11 @@
+[package]
+name = "hoth-publisher"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+hoth-domain = { path = "../hoth-domain" }
+
+[dev-dependencies]
+serde_json = { version = "1", features = ["float_roundtrip"] }
