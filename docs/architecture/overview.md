@@ -4,7 +4,7 @@
 Generate plausible satellite kinematics to stimulate downstream simulation systems. Historical OMM/TLE catalogs provide representative orbital populations, **not** authoritative historical truth.
 
 ## Pipeline
-1. Operator-run `hoth catalog bootstrap`: retrieve permitted historical GP records, sample monthly for five years, enrich SATCAT/RCS, persist SQLite. Supports local file import and current CelesTrak refresh.
+1. Operator-run `hoth catalog bootstrap`: retrieve permitted historical GP records, sample monthly for five years, enrich SATCAT/RCS, persist the [SQLite catalog](catalog.md). Supports local file import and current CelesTrak refresh.
 2. `hoth scenario prepare`: load versioned YAML; choose snapshot, initialize plausible orbits, evaluate radar FOV union over entire scenario, write immutable manifest containing object membership, source epochs, selected records, IDs, and provenance.
 3. `hoth run`: load manifest offline; accept standalone or external clock, propagate using SGP4 at absolute UTC simulation time; convert TEME to ECEF; publish canonical state.
 4. DIS 7 UDP publisher in v1; Zenoh/protobuf later via common publisher interface.
