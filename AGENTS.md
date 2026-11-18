@@ -1,7 +1,7 @@
 # HOTH Agent Instructions
 
 ## Project contract
-HOTH = Historical Orbit Telemetry Harness. This is a satellite **stimulus generator**, not historical truth reconstruction. Preserve approved decisions in README and docs/architecture/overview.md. Do not change public interfaces, frame conventions, time semantics, or mission manifest schema without an ADR.
+HOTH = High-Throughput Orbit Telemetry Harness. This is a satellite **stimulus generator**, not historical truth reconstruction. Preserve approved decisions in README and docs/architecture/overview.md. Do not change public interfaces, frame conventions, time semantics, or mission manifest schema without an ADR.
 
 ## Workflow
 - Work on a topic branch; open a focused PR. Never push implementation directly to main.
