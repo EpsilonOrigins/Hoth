@@ -23,7 +23,7 @@ name = "hoth"
 version = "0.1.0"
 
 [[package]]
-name = "hoth-core"
+name = "hoth-domain"
 version = "0.1.0"
 dependencies = [
  "chrono",

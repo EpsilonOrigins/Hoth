@@ -6,6 +6,21 @@ use std::{error::Error, fmt, num::NonZeroU32};
 /// An absolute UTC instant. Serde uses an RFC 3339 string and normalizes offsets to UTC.
 pub type UtcInstant = chrono::DateTime<chrono::Utc>;
 
+/// The absolute simulation time at which the position and velocity apply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SimulationUtc(UtcInstant);
+
+impl SimulationUtc {
+    pub const fn new(instant: UtcInstant) -> Self {
+        Self(instant)
+    }
+
+    pub const fn instant(self) -> UtcInstant {
+        self.0
+    }
+}
+
 /// A positive NORAD catalog number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -79,6 +94,58 @@ impl TryFrom<[f64; 3]> for VelocityMetersPerSecond {
     }
 }
 
+/// A Cartesian position in kilometers, ordered [x, y, z].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "[f64; 3]")]
+pub struct PositionKilometers([f64; 3]);
+
+impl PositionKilometers {
+    pub const fn xyz(self) -> [f64; 3] {
+        self.0
+    }
+
+    /// Rescales the components in the same frame. Returns an error on overflow.
+    pub fn to_meters(self) -> Result<PositionMeters, StateValidationError> {
+        PositionMeters::try_from(self.0.map(kilometers_to_meters))
+    }
+}
+
+impl TryFrom<[f64; 3]> for PositionKilometers {
+    type Error = StateValidationError;
+
+    fn try_from(xyz: [f64; 3]) -> Result<Self, Self::Error> {
+        finite_xyz(xyz).map(Self)
+    }
+}
+
+/// A Cartesian velocity in kilometers per second, ordered [x, y, z].
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "[f64; 3]")]
+pub struct VelocityKilometersPerSecond([f64; 3]);
+
+impl VelocityKilometersPerSecond {
+    pub const fn xyz(self) -> [f64; 3] {
+        self.0
+    }
+
+    /// Rescales the components in the same frame. Returns an error on overflow.
+    pub fn to_meters_per_second(self) -> Result<VelocityMetersPerSecond, StateValidationError> {
+        VelocityMetersPerSecond::try_from(self.0.map(kilometers_to_meters))
+    }
+}
+
+impl TryFrom<[f64; 3]> for VelocityKilometersPerSecond {
+    type Error = StateValidationError;
+
+    fn try_from(xyz: [f64; 3]) -> Result<Self, Self::Error> {
+        finite_xyz(xyz).map(Self)
+    }
+}
+
+fn kilometers_to_meters(component: f64) -> f64 {
+    component * 1_000.0
+}
+
 fn finite_xyz(xyz: [f64; 3]) -> Result<[f64; 3], StateValidationError> {
     if xyz.iter().all(|component| component.is_finite()) {
         Ok(xyz)
@@ -114,12 +181,13 @@ impl EcefState {
     }
 }
 
-/// True equator, mean equinox kinematics in SI units.
+/// True equator, mean equinox kinematics in kilometers and kilometers per second.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct TemeState {
     frame: TemeFrame,
-    pub position_m: PositionMeters,
-    pub velocity_m_per_s: VelocityMetersPerSecond,
+    pub at_utc: SimulationUtc,
+    pub position_km: PositionKilometers,
+    pub velocity_km_s: VelocityKilometersPerSecond,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -130,13 +198,15 @@ enum TemeFrame {
 
 impl TemeState {
     pub const fn new(
-        position_m: PositionMeters,
-        velocity_m_per_s: VelocityMetersPerSecond,
+        at_utc: SimulationUtc,
+        position_km: PositionKilometers,
+        velocity_km_s: VelocityKilometersPerSecond,
     ) -> Self {
         Self {
             frame: TemeFrame::Teme,
-            position_m,
-            velocity_m_per_s,
+            at_utc,
+            position_km,
+            velocity_km_s,
         }
     }
 }
@@ -197,10 +267,16 @@ fn deserialize_nonblank<'de, D: Deserializer<'de>>(deserializer: D) -> Result<St
 }
 
 /// Canonical state at a simulation UTC instant, ready for a publisher to consume.
+///
+/// ```compile_fail
+/// use hoth_domain::state::{EcefState, TemeState};
+/// fn publish(_: EcefState) {}
+/// fn publish_teme(teme: TemeState) { publish(teme); }
+/// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SatelliteState {
     pub norad_id: NoradId,
-    pub simulation_utc: UtcInstant,
+    pub at_utc: SimulationUtc,
     pub ecef: EcefState,
     pub provenance: StateProvenance,
 }
