@@ -1,37 +1,22 @@
 # HOTH — High-Throughput Orbit Telemetry Harness
 
-HOTH is an offline-capable Rust satellite simulation stimulus generator. It initializes plausible orbital populations from monthly historical orbital-element snapshots, propagates states using SGP4, and publishes kinematics via pluggable publishers. **HOTH does not reconstruct historical ground truth.**
+HOTH generates reproducible orbital telemetry for local and distributed simulation. It prepares representative satellite populations from current and historical orbital elements, propagates absolute UTC states using SGP4, and publishes Earth-fixed kinematics over DIS 7 UDP and Protobuf/Zenoh. Historical elements describe the input population. Synthetic initialization creates plausible stimulus for a requested mission time.
 
-## Approved baseline
-- Private personal repository; Rust Cargo workspace.
-- Five-year rolling catalog of monthly orbital snapshots, with authenticated Space-Track historical backfill and local import. CelesTrak supports current updates; no runtime web access.
-- SQLite operational catalog; immutable, reproducible scenario manifests; versioned YAML scenarios.
-- SGP4; explicitly documented TEME/ECEF coordinate and velocity transforms; f64 calculations.
-- Simulation clock supports standalone and external authority, pause, seek, replay.
-- Mission-wide union of radar FOVs selects a fixed satellite population; radar detection is out of scope.
-- Pluggable publisher contract; DIS 7 Entity State over UDP in v1; Zenoh/protobuf after v1.
-- Kubernetes production deployment via Helm; Docker Compose for integration testing.
-- Benchmark 15,000 objects at 25 Hz and explore up to 50,000; performance is not presumed.
+## Run locally
 
-## Development
-See [AGENTS.md](AGENTS.md), [architecture](docs/architecture/overview.md), and [agent execution plan](docs/architecture/agent-plan.md). The 32 planned issues are ordered by dependencies, with M0–M5 targeting v1 and M6 post-v1.
-
-Build and inspect the CLI with `cargo run --locked -p hoth -- --help`. Use `--version` to print the package version.
-
-This is a foundation scaffold; the presence of a CLI or CI configuration does not imply completed orbital or DIS functionality.
-
-## CI and container smoke test
-
-Rust CI fetches the locked Cargo dependencies during setup, then runs formatting, Clippy, and tests. Clippy and tests use Cargo offline mode. Tests use local fixtures and require no catalog services.
-
-Run the container smoke test from the repository root with Docker Engine and BuildKit for Linux containers, Docker Compose v2, and Bash.
+Build the Rust CLI and use the checked-in orbit catalog fixture and scenario. [Native quickstart](docs/operations/quickstart.md)
 
 ```sh
-docker compose -f deploy/compose.yaml config
-docker compose -f deploy/compose.yaml build hoth
-bash deploy/smoke.sh
+cargo build --release --locked -p hoth
+bash scripts/e2e.sh
 ```
 
-The image can also be built directly with `docker build -f deploy/Dockerfile .`. The initial build needs access to the base images and Cargo registry. Release compilation runs with BuildKit networking disabled. Both image stages use Debian Bookworm so the compiled binary and runtime use compatible system libraries.
+The script builds and runs the Docker Compose integration workflow, asserts DIS and routed Zenoh output from the same 100 satellites, drives mock lifecycle commands, and cleans up. Initial dependency and image fetches require package registry access. The simulation services use a private network and fixture data.
 
-Compose runs the prebuilt image with a read-only filesystem and no network. The smoke test checks the scaffold banner, runtime UID 10001, and the CLI's usage error. The DIS receiver and UDP integration harness belong to HOTH-027.
+## Reference
+
+- Catalog storage, acquisition and export. [SQLite catalog](docs/architecture/catalog.md) · [Space-Track](docs/architecture/space-track.md)
+- Configuration, initialization, frames and selection. [YAML v1](docs/interfaces/scenario-yaml.md) · [Orbit and manifest ADR](docs/decisions/0007-manifest-orbit-policy.md)
+- Local controller and dual publishing. [Execution Fabric](docs/architecture/fabric-integration.md) · [Runtime ADR](docs/decisions/0008-runtime-and-control.md)
+- Deployment and measured throughput. [Kubernetes](docs/operations/kubernetes.md) · [Benchmarks](docs/performance/benchmark-report.md)
+- Recorded evidence and open acceptance criteria. [Baseline assessment](docs/implementation/assessment.md) · [Implementation progress](docs/implementation/progress.md)

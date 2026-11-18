@@ -30,3 +30,7 @@ Execution order:
 5. Verify native and container workflows, Helm and performance, then reconcile evidence per issue.
 
 Baseline Rust 1.100.0: formatting, Clippy with warnings denied, and 52 tests passed. CLI help ran. Compose configuration rendered. The baseline image build failed during Cargo fetch because the managed proxy CA was absent from the builder trust store.
+
+## Implementation follow-through
+
+The implemented pipeline retained the approved type and storage boundaries and added a manifest-only runtime. See the [issue and verification record](progress.md) for acceptance evidence. The assumptions that matter most to downstream operators are the conservative radar speed bound, UTC-as-UT1 with zero pole motion, and UDP loss at high packet rates. The [benchmark report](../performance/benchmark-report.md) records the measured impact of batching, allocation reduction and receiver-buffer tuning.

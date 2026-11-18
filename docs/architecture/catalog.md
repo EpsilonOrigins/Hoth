@@ -25,3 +25,11 @@ The crate builds with bundled SQLite and uses ordinary SQLite files with strict 
 The [synthetic SQL fixture](../../crates/hoth-catalog/tests/fixtures/catalog.sql) shows two source epochs and one snapshot membership. See [ADR 0004](../decisions/0004-sqlite-catalog.md) for the schema decisions.
 
 The [Space-Track import guide](space-track.md) explains authenticated acquisition and resume behavior.
+
+## Monthly snapshots and coverage
+
+`hoth catalog snapshot` chooses the closest source epoch per NORAD ID to midnight UTC on the 15th. The symmetric age cutoff defaults to 17 days. Distances are compared at nanosecond resolution and equal distances are ordered by stored element ID. Replacement uses a single SQLite transaction. An empty month receives an empty snapshot and is reported as missing coverage. `catalog stats` and `catalog validate` can inspect a specific start-inclusive, end-exclusive range.
+
+Offline TLE and OMM imports use the same normalization rules as authenticated GP History. Import one or more records in a single transaction. Identical bytes in the same format deduplicate, and the first stored acquisition remains attached to the orbital record. SATCAT enrichment chooses the most recent acquisition independently for consolidated metadata and numeric RCS. Acquisition ID breaks time ties. Unknown RCS leaves any previous numeric value in place. Metadata never alters orbital records.
+
+`catalog export` uses SQLite's `VACUUM INTO` for a consistent portable copy, validates the copy, and publishes it at a new path. Validation checks SQLite integrity, foreign keys, hashes, original epochs and NORAD IDs. Transfer the file with an outer SHA-256 checksum to detect changes in transit. [Operator workflow](../operations/quickstart.md)
