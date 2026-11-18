@@ -1,4 +1,4 @@
-name: Release scaffold
+name: Build release candidate
 on:
   workflow_dispatch:
 jobs:
@@ -6,4 +6,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Release publishing intentionally not enabled until HOTH-029."
+      - run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt,clippy
+      - run: cargo fetch --locked
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+      - run: cargo test --workspace --locked --offline
+      - run: bash scripts/e2e.sh
+      - run: |
+          cargo build -p hoth --release --locked --offline
+          mkdir -p dist
+          tar -czf dist/hoth-linux-x86_64.tar.gz -C target/release hoth
+          cd dist
+          sha256sum hoth-linux-x86_64.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hoth-linux-x86_64
+          path: dist/

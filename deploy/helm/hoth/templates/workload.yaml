@@ -1,0 +1,30 @@
+{{- $job := eq .Values.workload "Job" }}
+{{- if not (or $job (eq .Values.workload "Deployment")) }}
+{{- fail "workload must be Job or Deployment" }}
+{{- end }}
+apiVersion: {{ if $job }}batch/v1{{ else }}apps/v1{{ end }}
+kind: {{ .Values.workload }}
+metadata:
+  name: {{ include "hoth.name" . }}
+  labels:
+    {{- include "hoth.selector" . | nindent 4 }}
+spec:
+  {{- if $job }}
+  backoffLimit: 0
+  {{- else }}
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hoth.selector" . | nindent 6 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "hoth.selector" . | nindent 8 }}
+      annotations:
+        checksum/values: {{ toJson .Values | sha256sum | quote }}
+    spec:
+      restartPolicy: {{ if $job }}Never{{ else }}Always{{ end }}
+      {{- include "hoth.pod" . | nindent 6 }}

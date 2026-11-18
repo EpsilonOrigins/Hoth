@@ -7,9 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - run: rustup toolchain install 1.100.0 --profile minimal --component rustfmt,clippy
       - name: Fetch locked dependencies
         run: cargo fetch --locked
       - run: cargo fmt --all -- --check

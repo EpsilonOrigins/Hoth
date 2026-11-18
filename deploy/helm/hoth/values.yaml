@@ -2,4 +2,20 @@ image:
   repository: hoth
   tag: '0.1.0'
   pullPolicy: IfNotPresent
-# Templates are implemented in HOTH-026.
+# Use Deployment only when the controller supervises automatic restarts.
+workload: Job
+storage:
+  existingClaim: hoth-artifacts
+  manifestPath: mission.json
+runId: ""
+control:
+  enabled: false
+  port: 4123
+resources:
+  requests: {cpu: "2", memory: 256Mi}
+  limits: {memory: 1Gi}
+networkPolicy:
+  enabled: false
+  dis: []
+  zenoh: []
+  controllers: []

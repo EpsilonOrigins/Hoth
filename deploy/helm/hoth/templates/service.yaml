@@ -1,0 +1,14 @@
+{{- if .Values.control.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hoth.name" . }}
+spec:
+  selector:
+    {{- include "hoth.selector" . | nindent 4 }}
+  ports:
+    - name: controller
+      targetPort: controller
+      port: {{ .Values.control.port }}
+      protocol: TCP
+{{- end }}

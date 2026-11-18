@@ -1,11 +1,43 @@
-name: hoth-smoke
+name: hoth-local
 
 services:
+  zenoh:
+    image: eclipse/zenoh:1.7.2
+    command: ["-l", "tcp/0.0.0.0:7447"]
+    networks:
+      sim:
+        ipv4_address: 172.29.186.10
+
   hoth:
+    image: hoth-integration:local
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    network_mode: none
+      target: integration
+    entrypoint: ["/bin/sh", "/usr/local/bin/run-fixture"]
+    depends_on: [zenoh]
     read_only: true
-    security_opt:
-      - no-new-privileges:true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      sim:
+        ipv4_address: 172.29.186.11
+
+  verify:
+    image: hoth-integration:local
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/hoth-verify"]
+    command: ["0.0.0.0:3000", "172.29.186.11:4123", "172.29.186.10:7447"]
+    depends_on: [zenoh, hoth]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      sim:
+        ipv4_address: 172.29.186.12
+
+networks:
+  sim:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.29.186.0/24
