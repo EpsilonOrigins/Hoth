@@ -1,4 +1,4 @@
-# Architecture — Historical Orbit Telemetry Harness
+# Architecture — High-Throughput Orbit Telemetry Harness
 
 ## Purpose
 Generate plausible satellite kinematics to stimulate downstream simulation systems. Historical OMM/TLE catalogs provide representative orbital populations, **not** authoritative historical truth.
