@@ -8,12 +8,12 @@ fn run(args: &[&str]) -> Output {
 }
 
 #[test]
-fn no_arguments_print_the_foundation_banner() {
+fn no_arguments_print_the_banner() {
     let output = run(&[]);
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        "HOTH — High-Throughput Orbit Telemetry Harness (foundation scaffold)\n"
+        "HOTH — High-Throughput Orbit Telemetry Harness\n"
     );
     assert!(output.stderr.is_empty());
 }

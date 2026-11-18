@@ -1,0 +1,39 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "hoth.name" . }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hoth.selector" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  {{- if and .Values.control.enabled .Values.networkPolicy.controllers }}
+  ingress:
+    - ports:
+        - {protocol: TCP, port: {{ .Values.control.port }}}
+      from:
+        {{- range .Values.networkPolicy.controllers }}
+        - ipBlock: {cidr: {{ . | quote }}}
+        {{- end }}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  {{- if or .Values.networkPolicy.dis .Values.networkPolicy.zenoh }}
+  egress:
+    {{- range .Values.networkPolicy.dis }}
+    - to:
+        - ipBlock: {cidr: {{ .cidr | quote }}}
+      ports:
+        - {protocol: UDP, port: {{ .port }}}
+    {{- end }}
+    {{- range .Values.networkPolicy.zenoh }}
+    - to:
+        - ipBlock: {cidr: {{ .cidr | quote }}}
+      ports:
+        - {protocol: TCP, port: {{ .port }}}
+    {{- end }}
+  {{- else }}
+  egress: []
+  {{- end }}
+{{- end }}

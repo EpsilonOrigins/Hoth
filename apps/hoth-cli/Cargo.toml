@@ -6,3 +6,22 @@ publish = false
 
 [dependencies]
 hoth-catalog = { path = "../../crates/hoth-catalog" }
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+ctrlc = { version = "3.5", features = ["termination"] }
+tempfile = "3"
+rusqlite = { version = "0.43", default-features = false }
+hoth-config = { path = "../../crates/hoth-config" }
+hoth-dis = { path = "../../crates/hoth-dis" }
+hoth-domain = { path = "../../crates/hoth-domain" }
+hoth-fabric-adapter = { path = "../../crates/hoth-fabric-adapter" }
+hoth-orbits = { path = "../../crates/hoth-orbits" }
+hoth-publisher = { path = "../../crates/hoth-publisher" }
+hoth-runtime = { path = "../../crates/hoth-runtime" }
+hoth-scenario = { path = "../../crates/hoth-scenario" }
+hoth-zenoh = { path = "../../crates/hoth-zenoh" }
+prost = "0.14"
+serde_json = { version = "1", features = ["float_roundtrip"] }
+zenoh = { version = "=1.7.2", default-features = false, features = ["transport_tcp"] }
+
+[dev-dependencies]
+socket2 = "0.6"

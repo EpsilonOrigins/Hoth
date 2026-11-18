@@ -4,7 +4,7 @@
 
 `hoth_domain::state::SatelliteState` carries a positive `u32` NORAD catalog ID, the `SimulationUtc` instant `at_utc`, ECEF kinematics, and orbital-element provenance. Canonical kinematics use meters and meters per second, and ECEF velocity is relative to the rotating ECEF axes. The SGP4-facing `TemeState` carries its own `at_utc` and uses kilometers and kilometers per second. Both frames use finite `f64` Cartesian components ordered `[x, y, z]`.
 
-The required `frame` tag identifies the units and reference frame together. `ECEF` uses `position_m` and `velocity_m_per_s`. `TEME` uses `position_km` and `velocity_km_s`. The kilometer types scale each component by 1,000 when converting to meter units and reject overflow. The scaling preserves the reference frame. HOTH-014 owns the Earth-fixed transformation, including the Earth-rotation term for velocity.
+The required `frame` tag identifies the units and reference frame together. `ECEF` uses `position_m` and `velocity_m_per_s`. `TEME` uses `position_km` and `velocity_km_s`. The kilometer types scale each component by 1,000 when converting to meter units and reject overflow. The scaling preserves the reference frame. The frame transform uses GMST and applies the Earth-rotation velocity term. [Frame model](../decisions/0007-manifest-orbit-policy.md)
 
 Timestamps use RFC 3339 and serialize in UTC, including when the input has a numeric offset. `at_utc` is the absolute simulation instant of the vectors. The source record epoch is tracked independently.
 
@@ -30,7 +30,10 @@ Initialize each instance once before submitting or flushing. Success on submissi
 
 `hoth_domain::orbit::OrbitalElement` carries the NORAD ID, source UTC epoch, normalized mean elements, and original source record with provenance. See [supported input formats and validation rules](orbital-elements.md).
 
-## Planned interfaces
+## Scenario manifest
 
-- ScenarioManifest: schema version; scenario clock policy; catalog snapshot and source records; fixed selected NORAD IDs; deterministic DIS Entity ID/type mapping; FOV selection metadata and provenance.
-- Frame conversions: TEME to ECEF with Earth-rotation velocity term; all frame assumptions explicit.
+The JSON v1 manifest contains the scenario YAML, canonical payload and scenario digests, catalog snapshot ID, selected orbital records, source and initialization epochs, and deterministic DIS identities. The runtime validates it before opening publishers. See the [manifest decision](../decisions/0007-manifest-orbit-policy.md).
+
+## Telemetry
+
+Read the [publisher assumptions](../decisions/0008-runtime-and-control.md) and [Protobuf v1 contract](../../proto/hoth/telemetry/v1/satellite.proto) for the wire representation.

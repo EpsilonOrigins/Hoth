@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 hoth-domain = { path = "../hoth-domain" }
+chrono.workspace = true

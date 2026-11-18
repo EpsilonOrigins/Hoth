@@ -7,8 +7,16 @@ members = [
     "crates/hoth-config",
     "crates/hoth-domain",
     "crates/hoth-publisher",
+    "crates/hoth-orbits",
+    "crates/hoth-scenario",
+    "crates/hoth-dis",
+    "crates/hoth-runtime",
+    "crates/hoth-zenoh",
+    "crates/hoth-fabric-adapter",
 ]
+
+[workspace.dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 
 [workspace.package]
 edition = "2021"
-license = "UNLICENSED"

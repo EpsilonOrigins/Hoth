@@ -136,14 +136,14 @@ fn rejects_unknown_modes_fields_and_empty_publishers() {
             "time.clock",
             "standalone",
         ),
-        ("mode: all", "mode: radar_union", "selection.mode", "all"),
+        ("mode: all", "mode: radar_union", "selection.mode", "radars"),
         (
             "mode: all",
             "mode: all\n  radar_ids: []",
             "selection",
             "unknown field `radar_ids`",
         ),
-        ("type: dis", "type: zenoh", "publishers[0].type", "dis"),
+        ("type: dis", "type: unknown", "publishers[0].type", "dis"),
         (
             "rate_hz: 25",
             "rates_hz: 25",
@@ -159,7 +159,7 @@ fn rejects_unknown_modes_fields_and_empty_publishers() {
         "publishers",
         "at least one",
     );
-    assert_invalid(&format!("{EXAMPLE}radars: []"), "radars", "unknown field");
+    assert!(ScenarioConfig::from_yaml(&format!("{EXAMPLE}radars: []")).is_ok());
 }
 
 #[test]

@@ -7,7 +7,7 @@ docker image inspect "$image" >/dev/null
 compose_run=("${compose[@]}" run --rm --no-deps --pull never -T)
 
 banner=$("${compose_run[@]}" hoth)
-if [[ $banner != "HOTH — High-Throughput Orbit Telemetry Harness (foundation scaffold)" ]]; then
+if [[ $banner != "HOTH — High-Throughput Orbit Telemetry Harness" ]]; then
     printf 'Unexpected scaffold output: %s\n' "$banner" >&2
     exit 1
 fi
@@ -25,4 +25,4 @@ if [[ $status != 2 || $error != *"hoth --help"* ]]; then
     exit 1
 fi
 
-printf 'Compose smoke passed (scaffold, UID %s, invalid argument exit %s).\n' "$uid" "$status"
+printf 'Compose smoke passed (CLI, UID %s, invalid argument exit %s).\n' "$uid" "$status"

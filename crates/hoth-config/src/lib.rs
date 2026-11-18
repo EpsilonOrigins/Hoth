@@ -3,7 +3,13 @@
 pub use hoth_domain::clock::ClockMode;
 use hoth_domain::state::SimulationUtc;
 use serde::{de::Error as _, Deserialize, Deserializer};
-use std::{collections::HashMap, error::Error, fmt, net::SocketAddr, num::NonZeroU64};
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error,
+    fmt,
+    net::SocketAddr,
+    num::NonZeroU64,
+};
 use yaml_serde::Value;
 
 const SCHEMA_VERSION: i64 = 1;
@@ -19,6 +25,10 @@ pub struct ScenarioConfig {
     pub time: ScenarioTime,
     pub catalog: CatalogConfig,
     pub selection: SelectionConfig,
+    #[serde(default)]
+    pub radars: Vec<RadarConfig>,
+    #[serde(default)]
+    pub dis: DisConfig,
     #[serde(deserialize_with = "deserialize_publishers")]
     pub publishers: Vec<PublisherConfig>,
 }
@@ -37,7 +47,82 @@ impl ScenarioConfig {
             yaml_serde::from_str(input).map_err(|error| ScenarioError(Box::new(error)))?;
         // Check the version before interpreting fields using the v1 schema.
         deserialize_document::<VersionHeader>(&document)?;
-        deserialize_document(&document)
+        let config: Self = deserialize_document(&document)?;
+        config
+            .validate()
+            .map_err(|error| ScenarioError(error.into()))?;
+        Ok(config)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        use chrono::{Datelike, TimeDelta};
+        let duration = i64::try_from(self.time.duration_seconds.get())
+            .ok()
+            .and_then(TimeDelta::try_seconds)
+            .ok_or("time.duration_seconds overflows UTC")?;
+        let start = self.time.start_utc.instant();
+        let end = start
+            .checked_add_signed(duration)
+            .ok_or("time.duration_seconds overflows UTC")?;
+        if start.year() < 1 || end.year() > 9999 || start.timestamp_subsec_nanos() >= 1_000_000_000
+        {
+            return Err("time must use four-digit UTC years and ordinary POSIX seconds".into());
+        }
+        if self.selection.mode == SelectionMode::RadarUnion && self.radars.is_empty() {
+            return Err("selection.mode radar_union requires at least one entry in radars".into());
+        }
+        let mut ids = HashSet::new();
+        for (i, radar) in self.radars.iter().enumerate() {
+            for (field, value, min, max) in [
+                ("latitude_deg", radar.latitude_deg, -90.0, 90.0),
+                ("longitude_deg", radar.longitude_deg, -180.0, 180.0),
+                ("altitude_m", radar.altitude_m, -1000.0, 100_000.0),
+                ("azimuth_min_deg", radar.azimuth_min_deg, 0.0, 360.0),
+                ("azimuth_max_deg", radar.azimuth_max_deg, 0.0, 360.0),
+                ("elevation_min_deg", radar.elevation_min_deg, -90.0, 90.0),
+                ("elevation_max_deg", radar.elevation_max_deg, -90.0, 90.0),
+                ("range_min_m", radar.range_min_m, 0.0, f64::MAX),
+                ("range_max_m", radar.range_max_m, 0.0, f64::MAX),
+            ] {
+                if !(min..=max).contains(&value) {
+                    return Err(format!(
+                        "radars[{i}].{field} must be between {min} and {max}"
+                    ));
+                }
+            }
+            if radar.id.trim().is_empty() || !ids.insert(&radar.id) {
+                return Err(format!("radars[{i}].id must be nonblank and unique"));
+            }
+            if radar.elevation_min_deg > radar.elevation_max_deg
+                || radar.range_min_m >= radar.range_max_m
+            {
+                return Err(format!(
+                    "radars[{i}] has reversed elevation or range bounds"
+                ));
+            }
+        }
+        if self.dis.site == 0 || self.dis.application == 0 {
+            return Err("dis.site and dis.application must be positive".into());
+        }
+        for (i, publisher) in self.publishers.iter().enumerate() {
+            if publisher.destination.ip().is_unspecified()
+                || publisher.multicast != publisher.destination.ip().is_multicast()
+                || (publisher.multicast && publisher.kind != PublisherKind::Dis)
+            {
+                return Err(format!("publishers[{i}].destination requires a valid unicast address or DIS multicast opt-in"));
+            }
+            if !(0.001..=1000.0).contains(&publisher.rate_hz) {
+                return Err(format!(
+                    "publishers[{i}].rate_hz must be between 0.001 and 1000"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn end_utc(&self) -> SimulationUtc {
+        let delta = chrono::TimeDelta::seconds(self.time.duration_seconds.get() as i64);
+        SimulationUtc::new(self.time.start_utc.instant() + delta)
     }
 
     pub const fn schema_version(&self) -> i64 {
@@ -90,6 +175,7 @@ pub struct SelectionConfig {
 #[serde(rename_all = "snake_case")]
 pub enum SelectionMode {
     All,
+    RadarUnion,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -101,12 +187,49 @@ pub struct PublisherConfig {
     pub destination: SocketAddr,
     #[serde(deserialize_with = "deserialize_positive_rate")]
     pub rate_hz: f64,
+    #[serde(default)]
+    pub multicast: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PublisherKind {
     Dis,
+    Zenoh,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RadarConfig {
+    pub id: String,
+    pub latitude_deg: f64,
+    pub longitude_deg: f64,
+    pub altitude_m: f64,
+    pub azimuth_min_deg: f64,
+    pub azimuth_max_deg: f64,
+    pub elevation_min_deg: f64,
+    pub elevation_max_deg: f64,
+    #[serde(default)]
+    pub range_min_m: f64,
+    pub range_max_m: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DisConfig {
+    pub exercise_id: u8,
+    pub site: u16,
+    pub application: u16,
+}
+
+impl Default for DisConfig {
+    fn default() -> Self {
+        Self {
+            exercise_id: 1,
+            site: 1,
+            application: 1,
+        }
+    }
 }
 
 fn deserialize_document<'de, T: Deserialize<'de>>(

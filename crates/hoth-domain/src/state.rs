@@ -1,7 +1,7 @@
 //! Transport-neutral satellite state types shared by HOTH components.
 
-use serde::{Deserialize, Deserializer, Serialize};
-use std::{error::Error, fmt, num::NonZeroU32};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::{error::Error, fmt, num::NonZeroU32, sync::Arc};
 
 /// An absolute UTC instant. Serde uses an RFC 3339 string and normalizes offsets to UTC.
 pub type UtcInstant = chrono::DateTime<chrono::Utc>;
@@ -222,10 +222,16 @@ pub enum EpochInitialization {
 /// Traceability to the orbital element record used to initialize the simulated state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StateProvenance {
-    #[serde(deserialize_with = "deserialize_nonblank")]
-    source: String,
-    #[serde(deserialize_with = "deserialize_nonblank")]
-    source_record_id: String,
+    #[serde(
+        serialize_with = "serialize_nonblank",
+        deserialize_with = "deserialize_nonblank"
+    )]
+    source: Arc<str>,
+    #[serde(
+        serialize_with = "serialize_nonblank",
+        deserialize_with = "deserialize_nonblank"
+    )]
+    source_record_id: Arc<str>,
     pub source_epoch_utc: UtcInstant,
     pub initialization: EpochInitialization,
 }
@@ -238,8 +244,8 @@ impl StateProvenance {
         initialization: EpochInitialization,
     ) -> Result<Self, StateValidationError> {
         Ok(Self {
-            source: nonblank(source)?,
-            source_record_id: nonblank(source_record_id)?,
+            source: nonblank(source)?.into(),
+            source_record_id: nonblank(source_record_id)?.into(),
             source_epoch_utc,
             initialization,
         })
@@ -262,8 +268,14 @@ fn nonblank(value: String) -> Result<String, StateValidationError> {
     }
 }
 
-fn deserialize_nonblank<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
-    nonblank(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+fn serialize_nonblank<S: Serializer>(value: &str, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(value)
+}
+
+fn deserialize_nonblank<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Arc<str>, D::Error> {
+    nonblank(String::deserialize(deserializer)?)
+        .map(Arc::from)
+        .map_err(serde::de::Error::custom)
 }
 
 /// Canonical state at a simulation UTC instant, ready for a publisher to consume.

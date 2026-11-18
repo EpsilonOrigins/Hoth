@@ -1,8 +1,9 @@
 //! Source orbital elements for initializing satellite propagation.
 
 use crate::state::{NoradId, UtcInstant};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct OrbitalElement {
     pub norad_id: NoradId,
     /// Actual UTC epoch of the source record.
@@ -11,7 +12,7 @@ pub struct OrbitalElement {
     pub raw_source: RawOrbitalSource,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MeanElements {
     pub inclination_deg: f64,
     pub right_ascension_deg: f64,
@@ -26,7 +27,8 @@ pub struct MeanElements {
     pub mean_motion_ddot: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ElementFormat {
     Tle,
     Omm,
@@ -41,7 +43,7 @@ impl ElementFormat {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RawOrbitalSource {
     pub format: ElementFormat,
     pub epoch_text: String,
@@ -51,7 +53,7 @@ pub struct RawOrbitalSource {
     pub provenance: RecordProvenance,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RecordProvenance {
     pub source: String,
     pub record_id: String,
