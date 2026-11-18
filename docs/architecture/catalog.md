@@ -14,6 +14,8 @@ Ingestion validates and emits normalized timestamps as `YYYY-MM-DDTHH:MM:SS.nnnn
 
 The membership primary key supports traversal in NORAD order within a snapshot. Separate indexes support element-to-snapshot lookups and element searches by NORAD ID and epoch or by epoch across the catalog. Deleting a snapshot removes its membership and retains the source elements.
 
+See the [orbital element parser contract](../interfaces/orbital-elements.md) for supported source formats, normalization, and diagnostics.
+
 ## Migrations and portability
 
 `hoth_catalog::schema::open(path)` opens or creates a writable SQLite file with foreign keys enabled. Use `schema::migrate(&mut connection)` to initialize an existing writable connection outside a transaction. Migration 1 creates the tables and migration 2 adds query indexes. The migrator reads `PRAGMA user_version` under a writer lock and commits all pending changes and version updates together. If a migration fails, the transaction rolls back. A build rejects catalog versions newer than it supports.
