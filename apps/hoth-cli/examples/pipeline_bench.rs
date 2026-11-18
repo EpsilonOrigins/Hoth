@@ -159,6 +159,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Direct isolated UDP and routed Zenoh adapters with competing receiver
     // threads. The serial DIS path shows the cost of one datagram per entity.
     let udp = UdpSocket::bind("127.0.0.1:0")?;
+    let socket = socket2::SockRef::from(&udp);
+    if let Some(bytes) = std::env::var_os("HOTH_BENCH_UDP_RX_BYTES") {
+        let bytes = bytes
+            .to_str()
+            .ok_or("receive buffer must be a byte count")?
+            .parse()?;
+        socket.set_recv_buffer_size(bytes)?;
+    }
+    println!("udp_receive_buffer_bytes={}", socket.recv_buffer_size()?);
     udp.set_read_timeout(Some(Duration::from_millis(50)))?;
     let address = udp.local_addr()?;
     let running = Arc::new(AtomicBool::new(true));

@@ -22,3 +22,6 @@ hoth-zenoh = { path = "../../crates/hoth-zenoh" }
 prost = "0.14"
 serde_json = { version = "1", features = ["float_roundtrip"] }
 zenoh = { version = "=1.7.2", default-features = false, features = ["transport_tcp"] }
+
+[dev-dependencies]
+socket2 = "0.6"

@@ -17,9 +17,15 @@ if [[ ${HOTH_SKIP_BUILD:-0} != 1 ]]; then
     "${compose[@]}" build hoth
 fi
 "${compose[@]}" up -d --no-build
-timeout 45 "${compose[@]}" wait verify
-timeout 15 "${compose[@]}" wait hoth
-for service in verify hoth; do
+wait_for_service() {
+    local service=$1 limit=$2 id status
     id=$("${compose[@]}" ps -aq "$service")
-    [[ -n $id && $(docker inspect --format '{{.State.ExitCode}}' "$id") == 0 ]]
-done
+    [[ -n $id ]]
+    status=$(timeout "$limit" docker wait "$id")
+    if [[ $status != 0 ]]; then
+        printf '%s exited with status %s\n' "$service" "$status" >&2
+        return 1
+    fi
+}
+wait_for_service verify 45
+wait_for_service hoth 15
