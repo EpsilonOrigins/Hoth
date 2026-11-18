@@ -1,5 +1,7 @@
 //! DIS 7 Entity State encoding and UDP transport.
 
+mod datagrams;
+
 use hoth_domain::state::{SatelliteState, SimulationUtc};
 use hoth_publisher::{PublishError, Publisher};
 use serde::{Deserialize, Serialize};
@@ -220,16 +222,18 @@ impl Publisher for UdpPublisher {
                 ));
             }
         }
-        for (index, state) in states.iter().enumerate() {
-            let entity = self.entities[&state.norad_id.get()];
-            let pdu = encode(state, entity, self.exercise_id);
-            match socket.send_to(&pdu, self.destination) {
-                Ok(PDU_BYTES) => {}
-                Err(error) if index == 0 && error.kind() == io::ErrorKind::WouldBlock => {
+        let mut packets = [[0; PDU_BYTES]; datagrams::PER_CALL];
+        for (chunk, states) in states.chunks(datagrams::PER_CALL).enumerate() {
+            for (packet, state) in packets.iter_mut().zip(states) {
+                let entity = self.entities[&state.norad_id.get()];
+                *packet = encode(state, entity, self.exercise_id);
+            }
+            match datagrams::send(socket, self.destination, &packets[..states.len()]) {
+                Ok(()) => {}
+                Err((0, error)) if chunk == 0 && error.kind() == io::ErrorKind::WouldBlock => {
                     return Err(PublishError::Backpressure);
                 }
-                Err(error) => return Err(sink(error)),
-                Ok(_) => return Err(PublishError::Sink("incomplete UDP datagram".into())),
+                Err((_, error)) => return Err(sink(error)),
             }
         }
         Ok(())

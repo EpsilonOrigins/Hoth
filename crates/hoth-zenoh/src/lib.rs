@@ -74,37 +74,34 @@ impl StateBatch {
         at: SimulationUtc,
         states: &[SatelliteState],
     ) -> Result<Self, PublishError> {
-        let states = states
-            .iter()
-            .enumerate()
-            .map(|(index, state)| {
-                if state.at_utc != at {
-                    return Err(PublishError::TimestampMismatch {
-                        index,
-                        expected: at,
-                        actual: state.at_utc,
-                    });
-                }
-                let source = &state.provenance;
-                Ok(State {
-                    norad_id: state.norad_id.get(),
-                    position_ecef_m: Some(state.ecef.position_m.xyz().into()),
-                    velocity_ecef_m_per_s: Some(state.ecef.velocity_m_per_s.xyz().into()),
-                    source: source.source().into(),
-                    source_record_id: source.source_record_id().into(),
-                    source_epoch: Some(source.source_epoch_utc.into()),
-                    synthetic_epoch: match source.initialization {
-                        EpochInitialization::SourceEpoch => None,
-                        EpochInitialization::Synthetic { epoch_utc } => Some(epoch_utc.into()),
-                    },
-                })
-            })
-            .collect::<Result<_, _>>()?;
+        let mut encoded = Vec::with_capacity(states.len());
+        for (index, state) in states.iter().enumerate() {
+            if state.at_utc != at {
+                return Err(PublishError::TimestampMismatch {
+                    index,
+                    expected: at,
+                    actual: state.at_utc,
+                });
+            }
+            let source = &state.provenance;
+            encoded.push(State {
+                norad_id: state.norad_id.get(),
+                position_ecef_m: Some(state.ecef.position_m.xyz().into()),
+                velocity_ecef_m_per_s: Some(state.ecef.velocity_m_per_s.xyz().into()),
+                source: source.source().into(),
+                source_record_id: source.source_record_id().into(),
+                source_epoch: Some(source.source_epoch_utc.into()),
+                synthetic_epoch: match source.initialization {
+                    EpochInitialization::SourceEpoch => None,
+                    EpochInitialization::Synthetic { epoch_utc } => Some(epoch_utc.into()),
+                },
+            });
+        }
         Ok(Self {
             schema_version: 1,
             run_id: run_id.into(),
             simulation_utc: Some(at.instant().into()),
-            states,
+            states: encoded,
         })
     }
 }
