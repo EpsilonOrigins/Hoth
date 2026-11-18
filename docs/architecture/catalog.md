@@ -18,8 +18,10 @@ See the [orbital element parser contract](../interfaces/orbital-elements.md) for
 
 ## Migrations and portability
 
-`hoth_catalog::schema::open(path)` opens or creates a writable SQLite file with foreign keys enabled. Use `schema::migrate(&mut connection)` to initialize an existing writable connection outside a transaction. Migration 1 creates the tables and migration 2 adds query indexes. The migrator reads `PRAGMA user_version` under a writer lock and commits all pending changes and version updates together. If a migration fails, the transaction rolls back. A build rejects catalog versions newer than it supports.
+`hoth_catalog::schema::open(path)` opens or creates a writable SQLite file with foreign keys enabled. Use `schema::migrate(&mut connection)` to initialize an existing writable connection outside a transaction. Migration 1 creates the catalog tables, migration 2 adds query indexes, and migration 3 adds Space-Track import checkpoints. The migrator reads `PRAGMA user_version` under a writer lock and commits all pending changes and version updates together. If a migration fails, the transaction rolls back. A build rejects catalog versions newer than it supports.
 
 The crate builds with bundled SQLite and uses ordinary SQLite files with strict tables. External SQLite tools need SQLite 3.37 or later. Transfer a closed, fully committed catalog or use SQLite's backup facilities to take a consistent copy. Catalog queries and migrations need no network access.
 
 The [synthetic SQL fixture](../../crates/hoth-catalog/tests/fixtures/catalog.sql) shows two source epochs and one snapshot membership. See [ADR 0004](../decisions/0004-sqlite-catalog.md) for the schema decisions.
+
+The [Space-Track import guide](space-track.md) explains authenticated acquisition and resume behavior.

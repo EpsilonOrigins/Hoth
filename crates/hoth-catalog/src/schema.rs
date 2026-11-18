@@ -6,6 +6,7 @@ use std::{error::Error, fmt, path::Path};
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_catalog.sql"),
     include_str!("../migrations/0002_catalog_indexes.sql"),
+    include_str!("../migrations/0003_space_track_checkpoints.sql"),
 ];
 
 pub const SCHEMA_VERSION: i64 = MIGRATIONS.len() as i64;
