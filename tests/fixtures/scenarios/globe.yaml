@@ -1,0 +1,7 @@
+schema_version: 1
+name: Local orbital replay
+catalog: {snapshot: "2021-11"}
+time: {start_utc: "2026-11-17T00:00:00Z", duration_seconds: 5700, clock: standalone, rate: 1}
+selection: {mode: all}
+publishers:
+  - {type: dis, destination: "127.0.0.1:3000", rate_hz: 25}

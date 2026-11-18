@@ -856,6 +856,7 @@ dependencies = [
 name = "hoth"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "chrono",
  "ctrlc",
  "hoth-catalog",
@@ -870,6 +871,7 @@ dependencies = [
  "hoth-zenoh",
  "prost",
  "rusqlite",
+ "serde",
  "serde_json",
  "socket2 0.6.5",
  "tempfile",
