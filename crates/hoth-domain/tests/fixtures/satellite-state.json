@@ -1,0 +1,25 @@
+{
+  "norad_id": 100001,
+  "at_utc": "2026-11-18T05:00:00.123456789Z",
+  "ecef": {
+    "frame": "ECEF",
+    "position_m": [
+      6778137.000000001,
+      1.0,
+      -2.0
+    ],
+    "velocity_m_per_s": [
+      0.0,
+      7500.123456789,
+      -6.0
+    ]
+  },
+  "provenance": {
+    "source": "local_fixture",
+    "source_record_id": "fixture-1",
+    "source_epoch_utc": "2026-10-01T00:00:00Z",
+    "initialization": {
+      "kind": "source_epoch"
+    }
+  }
+}
