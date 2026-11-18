@@ -12,6 +12,10 @@ Provenance records a nonblank source and record ID, the original `source_epoch_u
 
 The [canonical JSON fixture](../../crates/hoth-domain/tests/fixtures/satellite-state.json) shows the expected representation with illustrative coordinates.
 
+## Scenario YAML
+
+`hoth_config::ScenarioConfig::from_yaml` parses and validates the versioned configuration used for scenario preparation. See the [v1 fields and validation rules](scenario-yaml.md).
+
 ## Planned interfaces
 
 - OrbitalElement: original OMM/TLE record, actual epoch, source, acquisition time, checksum.

@@ -13,4 +13,3 @@ publishers:
   - type: dis
     destination: "127.0.0.1:3000"
     rate_hz: 25
-# Illustrative contract only. Parser and validation are future issues.
