@@ -38,3 +38,13 @@ HOTH propagates each sample with the same engine used for telemetry publishing. 
 ```sh
 cargo test --locked -p hoth --example orbit_globe
 ```
+
+## Validate the propagation
+
+Run the offline Vallado dataset test to compare the same propagation engine used by the globe against independent TEME and ECEF vectors.
+
+```sh
+cargo test --locked -p hoth-orbits --test reference -- --nocapture
+```
+
+The test checks 86 timestamped states across five published orbit cases and a synthetic re-epoch case. [Reference data and tolerances](../../crates/hoth-orbits/tests/fixtures/vallado/README.md)

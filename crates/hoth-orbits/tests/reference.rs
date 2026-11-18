@@ -1,10 +1,11 @@
 use chrono::TimeDelta;
 use hoth_catalog::parse::parse_tle;
 use hoth_domain::{
-    orbit::RecordProvenance,
-    state::{EpochInitialization, SimulationUtc, TemeState},
+    orbit::{OrbitalElement, RecordProvenance},
+    state::{EpochInitialization, SimulationUtc, TemeState, UtcInstant},
 };
-use hoth_orbits::{teme_to_ecef, PropagationError, Propagator};
+use hoth_orbits::{teme_to_ecef, EarthRotation, PropagationError, Propagator};
+use std::collections::BTreeMap;
 
 fn close(actual: [f64; 3], expected: [f64; 3], tolerance: f64) {
     for (actual, expected) in actual.into_iter().zip(expected) {
@@ -15,45 +16,146 @@ fn close(actual: [f64; 3], expected: [f64; 3], tolerance: f64) {
     }
 }
 
+fn verification_elements() -> BTreeMap<u32, OrbitalElement> {
+    let lines: Vec<_> = include_str!("fixtures/vallado/verification.tle")
+        .lines()
+        .collect();
+    let (records, rest) = lines.as_chunks::<2>();
+    assert!(rest.is_empty());
+    records
+        .iter()
+        .map(|[line1, line2]| {
+            let element = parse_tle(
+                format!("{line1}\n{line2}\n").as_bytes(),
+                RecordProvenance {
+                    source: "CelesTrak AIAA 2006-6753".into(),
+                    record_id: line1[2..7].into(),
+                },
+            )
+            .unwrap()
+            .element;
+            (element.norad_id.get(), element)
+        })
+        .collect()
+}
+
+fn norm_error(actual: [f64; 3], expected: [f64; 3], scale: f64) -> f64 {
+    let [dx, dy, dz] = std::array::from_fn(|i| scale * (actual[i] - expected[i]));
+    dx.hypot(dy).hypot(dz)
+}
+
 #[test]
-fn vallado_wgs72_space_track_verification_case_00005() {
-    // Vallado AIAA 2006-6753 SGP4-VER.TLE and tcppver.out, object 00005.
-    let tle = b"1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753\n2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667\n";
-    let mut element = parse_tle(
-        tle,
-        RecordProvenance {
-            source: "AIAA 2006-6753".into(),
-            record_id: "00005".into(),
-        },
-    )
-    .unwrap()
-    .element;
-    let orbit = Propagator::new(&element, EpochInitialization::SourceEpoch).unwrap();
-    for (minutes, position, velocity) in [
-        (
-            0,
-            [7022.46529266, -1400.08296755, 0.03995155],
-            [1.893841015, 6.405893759, 4.534807250],
-        ),
-        (
-            360,
-            [-7154.03120202, -3783.17682504, -3536.19412294],
-            [4.741887409, -4.151817765, -2.093935425],
-        ),
-        (
-            1440,
-            [-938.55923943, -6268.18748831, -4294.02924751],
-            [7.536105209, -0.427127707, 0.989878080],
-        ),
-    ] {
-        let state = orbit
-            .teme(SimulationUtc::new(
-                element.epoch_utc + TimeDelta::minutes(minutes),
-            ))
-            .unwrap();
-        close(state.position_km.xyz(), position, 1e-6);
-        close(state.velocity_km_s.xyz(), velocity, 1e-8);
+fn vallado_reference_trajectories_in_teme_and_ecef() {
+    const POSITION_LIMIT_M: f64 = 0.01;
+    const VELOCITY_LIMIT_M_S: f64 = 0.0001;
+    const SYNTHETIC_NORAD: u32 = 8195;
+    let synthetic_epoch: UtcInstant = "2026-11-17T00:00:00Z".parse().unwrap();
+    let synthetic = EpochInitialization::Synthetic {
+        epoch_utc: synthetic_epoch,
+    };
+
+    let elements = verification_elements();
+    let source_orbits: BTreeMap<_, _> = elements
+        .iter()
+        .map(|(&norad, element)| {
+            (
+                norad,
+                Propagator::new(element, EpochInitialization::SourceEpoch).unwrap(),
+            )
+        })
+        .collect();
+    let synthetic_orbit = Propagator::new(&elements[&SYNTHETIC_NORAD], synthetic).unwrap();
+    let mut cases = BTreeMap::new();
+    let mut maxima = [0.0_f64; 4];
+
+    for line in include_str!("fixtures/vallado/vectors.csv").lines().skip(1) {
+        let mut fields = line.split(',');
+        let mode = fields.next().unwrap();
+        let norad: u32 = fields.next().unwrap().parse().unwrap();
+        let offset: i64 = fields.next().unwrap().parse().unwrap();
+        let at = SimulationUtc::new(fields.next().unwrap().parse().unwrap());
+        let mut vectors = fields.map(|field| field.parse::<f64>().unwrap());
+        let mut next_vector = || std::array::from_fn(|_| vectors.next().unwrap());
+        let teme_position = next_vector();
+        let teme_velocity = next_vector();
+        let ecef_position = next_vector();
+        let ecef_velocity = next_vector();
+        assert!(
+            vectors.next().is_none(),
+            "unexpected vector fields for NORAD {norad}"
+        );
+
+        let source_epoch = elements[&norad].epoch_utc;
+        let (orbit, epoch, initialization) = match mode {
+            "source" => (
+                &source_orbits[&norad],
+                source_epoch,
+                EpochInitialization::SourceEpoch,
+            ),
+            "synthetic" if norad == SYNTHETIC_NORAD => {
+                (&synthetic_orbit, synthetic_epoch, synthetic)
+            }
+            _ => panic!("unexpected reference case {mode}/{norad}"),
+        };
+        assert_eq!(
+            at.instant() - epoch,
+            TimeDelta::seconds(offset),
+            "NORAD {norad} {mode} epoch at offset {offset} s"
+        );
+
+        let teme = orbit.teme(at).unwrap();
+        let canonical = orbit.state(EarthRotation::at(at)).unwrap();
+        assert_eq!(teme.at_utc, at);
+        assert_eq!(canonical.at_utc, at);
+        assert_eq!(canonical.norad_id.get(), norad);
+        assert_eq!(canonical.provenance.source_epoch_utc, source_epoch);
+        assert_eq!(canonical.provenance.initialization, initialization);
+
+        let errors = [
+            norm_error(teme.position_km.xyz(), teme_position, 1000.0),
+            norm_error(teme.velocity_km_s.xyz(), teme_velocity, 1000.0),
+            norm_error(canonical.ecef.position_m.xyz(), ecef_position, 1.0),
+            norm_error(canonical.ecef.velocity_m_per_s.xyz(), ecef_velocity, 1.0),
+        ];
+        for (i, (quantity, limit)) in [
+            ("TEME position (m)", POSITION_LIMIT_M),
+            ("TEME velocity (m/s)", VELOCITY_LIMIT_M_S),
+            ("ECEF position (m)", POSITION_LIMIT_M),
+            ("ECEF velocity (m/s)", VELOCITY_LIMIT_M_S),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            assert!(
+                errors[i] <= limit,
+                "NORAD {norad} {mode} at {} ({offset:+} s): {quantity} error {:.9e} exceeds {limit:.9e}",
+                at.instant(), errors[i]
+            );
+            maxima[i] = maxima[i].max(errors[i]);
+        }
+        *cases.entry((mode, norad)).or_default() += 1;
     }
+
+    assert_eq!(
+        cases,
+        BTreeMap::from([
+            (("source", 5), 13),
+            (("source", 4632), 5),
+            (("source", 8195), 25),
+            (("source", 24208), 13),
+            (("source", 28057), 25),
+            (("synthetic", 8195), 5),
+        ])
+    );
+    println!(
+        "Maximum TEME error {:.9e} m and {:.9e} m/s; maximum ECEF error {:.9e} m and {:.9e} m/s",
+        maxima[0], maxima[1], maxima[2], maxima[3]
+    );
+}
+
+#[test]
+fn rejects_invalid_and_subsurface_elements() {
+    let mut element = verification_elements().remove(&5).unwrap();
     element.mean_elements.mean_motion_rev_day = f64::NAN;
     assert!(matches!(
         Propagator::new(&element, EpochInitialization::SourceEpoch),
