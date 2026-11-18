@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-compose_run=(docker compose -f deploy/compose.yaml run --rm --no-deps --no-build --pull never -T)
+compose=(docker compose -f deploy/compose.yaml)
+image=$("${compose[@]}" config --images hoth)
+docker image inspect "$image" >/dev/null
+compose_run=("${compose[@]}" run --rm --no-deps --pull never -T)
 
 banner=$("${compose_run[@]}" hoth)
 if [[ $banner != "HOTH — High-Throughput Orbit Telemetry Harness (foundation scaffold)" ]]; then
