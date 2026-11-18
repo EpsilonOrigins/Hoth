@@ -19,3 +19,19 @@ See [AGENTS.md](AGENTS.md), [architecture](docs/architecture/overview.md), and [
 Build and inspect the CLI with `cargo run --locked -p hoth -- --help`. Use `--version` to print the package version.
 
 This is a foundation scaffold; the presence of a CLI or CI configuration does not imply completed orbital or DIS functionality.
+
+## CI and container smoke test
+
+Rust CI fetches the locked Cargo dependencies during setup, then runs formatting, Clippy, and tests. Clippy and tests use Cargo offline mode. Tests use local fixtures and require no catalog services.
+
+Run the container smoke test from the repository root with Docker Engine and BuildKit for Linux containers, Docker Compose v2, and Bash.
+
+```sh
+docker compose -f deploy/compose.yaml config
+docker compose -f deploy/compose.yaml build hoth
+bash deploy/smoke.sh
+```
+
+The image can also be built directly with `docker build -f deploy/Dockerfile .`. The initial build needs access to the base images and Cargo registry. Release compilation runs with BuildKit networking disabled. Both image stages use Debian Bookworm so the compiled binary and runtime use compatible system libraries.
+
+Compose runs the prebuilt image with a read-only filesystem and no network. The smoke test checks the scaffold banner, runtime UID 10001, and the CLI's usage error. The DIS receiver and UDP integration harness belong to HOTH-027.

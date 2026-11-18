@@ -1,10 +1,14 @@
-FROM rust:slim AS builder
+# syntax=docker/dockerfile:1
+FROM rust:slim-bookworm AS builder
 WORKDIR /src
-COPY . .
-RUN cargo build --release --locked
+COPY Cargo.toml Cargo.lock ./
+COPY apps/ apps/
+COPY crates/ crates/
+RUN cargo fetch --locked
+RUN --network=none cargo build -p hoth --release --locked --offline
 
 FROM debian:bookworm-slim
-RUN useradd --uid 10001 --create-home hoth
+RUN groupadd --gid 10001 hoth && useradd --uid 10001 --gid hoth --create-home hoth
 COPY --from=builder /src/target/release/hoth /usr/local/bin/hoth
-USER 10001
+USER 10001:10001
 ENTRYPOINT ["/usr/local/bin/hoth"]
