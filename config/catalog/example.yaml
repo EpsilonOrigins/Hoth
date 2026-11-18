@@ -1,0 +1,8 @@
+catalog:
+  database: "./data/hoth.db"
+  retention_years: 5
+  sampling: monthly
+  historical_source: space-track
+  allow_runtime_network: false
+  preserve_original_epochs: true
+# Illustrative configuration; parser implementation is tracked separately.
