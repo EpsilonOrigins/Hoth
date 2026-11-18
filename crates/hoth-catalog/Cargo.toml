@@ -12,4 +12,5 @@ rusqlite = { version = "0.43", default-features = false, features = ["bundled"] 
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "raw_value"] }
 sha2 = { version = "0.11", default-features = false }
+tempfile = "3"
 ureq = { version = "3.5", features = ["cookies"] }

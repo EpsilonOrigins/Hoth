@@ -85,3 +85,6 @@ pub trait SimulationClock {
     /// explicit seek changes its current instant.
     fn apply(&mut self, event: ClockEvent) -> Result<(), ClockError>;
 }
+
+mod driver;
+pub use driver::Clock;

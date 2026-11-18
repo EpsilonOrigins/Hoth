@@ -1,0 +1,13 @@
+[package]
+name = "hoth-runtime"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+hoth-domain = { path = "../hoth-domain" }
+chrono.workspace = true
+hoth-clock = { path = "../hoth-clock" }
+hoth-orbits = { path = "../hoth-orbits" }
+hoth-publisher = { path = "../hoth-publisher" }
+hoth-scenario = { path = "../hoth-scenario" }

@@ -1,0 +1,12 @@
+[package]
+name = "hoth-zenoh"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+hoth-domain = { path = "../hoth-domain" }
+hoth-publisher = { path = "../hoth-publisher" }
+prost = "0.14"
+zenoh = { version = "=1.7.2", default-features = false, features = ["transport_tcp"] }
+serde_json = "1"

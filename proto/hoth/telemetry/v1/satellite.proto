@@ -1,0 +1,24 @@
+syntax = "proto3";
+package hoth.telemetry.v1;
+
+// UTC represented by Unix seconds and fractional nanoseconds.
+message Utc { int64 seconds = 1; uint32 nanos = 2; }
+message Vector3 { double x = 1; double y = 2; double z = 3; }
+
+message SatelliteState {
+  uint32 norad_id = 1;
+  Vector3 position_ecef_m = 2;
+  Vector3 velocity_ecef_m_per_s = 3;
+  string source = 4;
+  string source_record_id = 5;
+  Utc source_epoch = 6;
+  // Presence indicates synthetic initialization.
+  Utc synthetic_epoch = 7;
+}
+
+message StateBatch {
+  uint32 schema_version = 1;
+  string run_id = 2;
+  Utc simulation_utc = 3;
+  repeated SatelliteState states = 4;
+}
