@@ -16,4 +16,6 @@ HOTH is an offline-capable Rust satellite simulation stimulus generator. It init
 ## Development
 See [AGENTS.md](AGENTS.md), [architecture](docs/architecture/overview.md), and [agent execution plan](docs/architecture/agent-plan.md). The 32 planned issues are ordered by dependencies, with M0–M5 targeting v1 and M6 post-v1.
 
+Build and inspect the CLI with `cargo run --locked -p hoth -- --help`. Use `--version` to print the package version.
+
 This is a foundation scaffold; the presence of a CLI or CI configuration does not imply completed orbital or DIS functionality.
