@@ -1,10 +1,11 @@
+name: hoth-smoke
+
 services:
   hoth:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    command: []
+    network_mode: none
     read_only: true
     security_opt:
       - no-new-privileges:true
-    # Integration-test orchestration will be implemented by HOTH-027.
