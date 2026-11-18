@@ -1,3 +1,3 @@
 fn main() {
-    println!("HOTH — Historical Orbit Telemetry Harness (foundation scaffold)");
+    println!("HOTH — High-Throughput Orbit Telemetry Harness (foundation scaffold)");
 }
