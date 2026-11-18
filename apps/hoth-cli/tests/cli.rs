@@ -53,3 +53,42 @@ fn unsupported_arguments_fail_with_usage_guidance() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("hoth --help"));
     }
 }
+
+#[test]
+fn catalog_preview_needs_no_credentials_or_database_access() {
+    let output = Command::new(env!("CARGO_BIN_EXE_hoth"))
+        .env_remove("SPACE_TRACK_IDENTITY")
+        .env_remove("SPACE_TRACK_PASSWORD")
+        .args([
+            "catalog",
+            "bootstrap",
+            "--start",
+            "2021-11",
+            "--end",
+            "2026-11",
+            "--database",
+            ":",
+            "--dry-run",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("2021-11 through 2026-11 (end exclusive)"));
+    assert!(stdout.contains("No requests made"));
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn live_catalog_rejects_unscoped_requests_before_authentication() {
+    let output = run(&[
+        "catalog",
+        "bootstrap",
+        "--start",
+        "2020-01",
+        "--end",
+        "2020-02",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("requires explicit NORAD IDs"));
+}

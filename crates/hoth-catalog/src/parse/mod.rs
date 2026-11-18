@@ -206,7 +206,7 @@ fn finite(value: f64, field: &'static str) -> Result<f64, ParseError> {
     }
 }
 
-fn sha256_hex(record: &[u8]) -> String {
+pub(crate) fn sha256_hex(record: &[u8]) -> String {
     let mut hex = String::with_capacity(64);
     for byte in Sha256::digest(record) {
         write!(hex, "{byte:02x}").expect("writing to a String is infallible");
