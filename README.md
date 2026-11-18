@@ -1,4 +1,4 @@
-# HOTH — Historical Orbit Telemetry Harness
+# HOTH — High-Throughput Orbit Telemetry Harness
 
 HOTH is an offline-capable Rust satellite simulation stimulus generator. It initializes plausible orbital populations from monthly historical orbital-element snapshots, propagates states using SGP4, and publishes kinematics via pluggable publishers. **HOTH does not reconstruct historical ground truth.**
 
