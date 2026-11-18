@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "apps/hoth-cli",
+    "crates/hoth-catalog",
     "crates/hoth-clock",
     "crates/hoth-config",
     "crates/hoth-domain",
