@@ -4,14 +4,14 @@ HOTH generates reproducible orbital telemetry for local and distributed simulati
 
 ## Run locally
 
-Build the Rust CLI and use the checked-in orbit catalog fixture and scenario. [Native quickstart](docs/operations/quickstart.md)
+Build the container and open the bundled globe at `http://localhost:8080`.
 
 ```sh
-cargo build --release --locked -p hoth
-bash scripts/e2e.sh
+docker build -f deploy/Dockerfile -t hoth:local .
+docker run --rm -p 127.0.0.1:8080:8080 hoth:local
 ```
 
-The script builds and runs the Docker Compose integration workflow, asserts DIS and routed Zenoh output from the same 100 satellites, drives mock lifecycle commands, and cleans up. Initial dependency and image fetches require package registry access. The simulation services use a private network and fixture data.
+The image also runs the CLI, the offline propagation reference suite, and the benchmark. Use `bash scripts/e2e.sh` to verify DIS and routed Zenoh telemetry with Docker Compose. [Container commands](docs/operations/container.md) · [Native quickstart](docs/operations/quickstart.md)
 
 ## Reference
 

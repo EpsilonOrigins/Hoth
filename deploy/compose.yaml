@@ -9,11 +9,11 @@ services:
         ipv4_address: 172.29.186.10
 
   hoth:
-    image: hoth-integration:local
+    image: ${HOTH_IMAGE:-hoth:local}
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-      target: integration
+      target: package
     entrypoint: ["/bin/sh", "/usr/local/bin/run-fixture"]
     depends_on: [zenoh]
     read_only: true
@@ -24,7 +24,7 @@ services:
         ipv4_address: 172.29.186.11
 
   verify:
-    image: hoth-integration:local
+    image: ${HOTH_IMAGE:-hoth:local}
     pull_policy: never
     entrypoint: ["/usr/local/bin/hoth-verify"]
     command: ["0.0.0.0:3000", "172.29.186.11:4123", "172.29.186.10:7447"]

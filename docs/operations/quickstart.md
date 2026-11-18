@@ -45,6 +45,6 @@ Bootstrap uses an exclusive end and 60 completed months for five years. Explicit
 
 ## Local integration
 
-`bash scripts/e2e.sh` builds the image, runs the router, fixture setup, HOTH and verifier, and returns the verifier and runtime result. For an already built `hoth-integration:local` image, use `HOTH_SKIP_BUILD=1 bash scripts/e2e.sh`. The router image must already be available for an air-gapped run. The Compose test uses the private subnet `172.29.186.0/24`. If it overlaps another local network, update the Compose addresses and the fixture destinations together.
+`bash scripts/e2e.sh` builds the image, runs the router, fixture setup, HOTH and verifier, and returns the verifier and runtime result. For an already built `hoth:local` image, use `HOTH_SKIP_BUILD=1 bash scripts/e2e.sh`. The router image must already be available for an air-gapped run. The Compose test uses the private subnet `172.29.186.0/24`. If it overlaps another local network, update the Compose addresses and the fixture destinations together.
 
 On an invalid config or manifest, inspect the error path or checksum and prepare the manifest again. For zero UDP packets, confirm destination, socket and receiver startup order. For missing Zenoh messages, verify the router address and run key. For dropped batches or short counts, inspect per-publisher counters and receiver counts. High-rate UDP can lose packets even when the sender reports successful submissions.
