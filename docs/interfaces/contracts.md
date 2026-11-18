@@ -26,8 +26,11 @@ The [canonical JSON fixture](../../crates/hoth-domain/tests/fixtures/satellite-s
 
 Initialize each instance once before submitting or flushing. Success on submission acknowledges local acceptance, which may include bounded queuing. Backpressure means the entire batch was rejected and is safe to retry before submitting newer work. A sink failure may leave delivery partial or unknown and ends submissions to that instance. Flush drains accepted work to the sink. Shutdown releases resources, drops pending work, and can be called again. See [ADR 0003](../decisions/0003-clock-and-publisher-ports.md).
 
+## Orbital elements
+
+`hoth_domain::orbit::OrbitalElement` carries the NORAD ID, source UTC epoch, normalized mean elements, and original source record with provenance. See [supported input formats and validation rules](orbital-elements.md).
+
 ## Planned interfaces
 
-- OrbitalElement: original OMM/TLE record, actual epoch, source, acquisition time, checksum.
 - ScenarioManifest: schema version; scenario clock policy; catalog snapshot and source records; fixed selected NORAD IDs; deterministic DIS Entity ID/type mapping; FOV selection metadata and provenance.
 - Frame conversions: TEME to ECEF with Earth-rotation velocity term; all frame assumptions explicit.
