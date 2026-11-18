@@ -1,0 +1,9 @@
+name: Release scaffold
+on:
+  workflow_dispatch:
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Release publishing intentionally not enabled until HOTH-029."
