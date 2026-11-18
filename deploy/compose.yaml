@@ -1,0 +1,10 @@
+services:
+  hoth:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: []
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    # Integration-test orchestration will be implemented by HOTH-027.
