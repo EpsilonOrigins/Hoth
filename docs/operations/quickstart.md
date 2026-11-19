@@ -2,32 +2,34 @@
 
 ## Native offline simulation
 
-Install the Rust toolchain in `rust-toolchain.toml` and a C compiler. HOTH builds its own SQLite library.
-
-```sh
-cargo fetch --locked
-cargo build --release --locked --offline -p hoth
-hoth=target/release/hoth
-mkdir -p data
-"$hoth" catalog import --database data/fixture.sqlite --format omm-json \
-  --file tests/fixtures/catalog/population.json --source fixture
-"$hoth" catalog snapshot --database data/fixture.sqlite --month 2021-11
-"$hoth" catalog validate --database data/fixture.sqlite
-"$hoth" scenario prepare --database data/fixture.sqlite \
-  --config tests/fixtures/scenarios/standalone.yaml --output data/mission.json
-```
-
-Start the receiver in another terminal before running HOTH.
-
-```sh
-python3 scripts/dis_receive.py --count 100
-```
-
-```sh
-target/release/hoth run --manifest data/mission.json
-```
+Prepare the fixture catalog and mission, start the DIS receiver, and run HOTH from the repository root. [Manual build and run commands](../../README.md#manually-from-source)
 
 The example emits 100 satellites for three seconds of simulation. The manifest contains everything runtime needs. Repeat the run from the same manifest to replay a given absolute UTC. Use external control for exact chosen timestamps. SIGTERM and Ctrl-C stop the process and drain the publisher queues. A new preparation requires a fresh manifest path.
+
+## Native globe replay
+
+In the same terminal as the manual build, use the prepared catalog at `$demo/catalog.sqlite` to create a 95-minute globe replay. The globe samples the manifest directly, so you can generate it at any time after preparing the catalog.
+
+```sh
+"$hoth" scenario prepare --database "$demo/catalog.sqlite" \
+  --config tests/fixtures/scenarios/globe.yaml --output "$demo/globe.json"
+cargo run --release --locked -p hoth --example orbit_globe -- \
+  --manifest "$demo/globe.json" --output "$demo/orbit-globe.html" \
+  --norad 70000 --norad 70001 --norad 70002 --norad 70003
+printf '%s\n' "$demo/orbit-globe.html"
+```
+
+Open the printed HTML file in a browser to inspect the four selected satellites. For browsers that restrict local file URLs, serve the demo directory on loopback and open `http://127.0.0.1:8020/orbit-globe.html`. [Globe controls](orbit-globe.md#inspect-an-orbit)
+
+```sh
+python3 -m http.server 8020 --bind 127.0.0.1 --directory "$demo"
+```
+
+Run the propagation reference suite directly from the repository root to compare the orbit and frame transforms against 86 reference states. [Reference data and tolerances](../../crates/hoth-orbits/tests/fixtures/vallado/README.md)
+
+```sh
+cargo test --locked -p hoth-orbits --test reference -- --nocapture
+```
 
 ## Catalog preparation
 
