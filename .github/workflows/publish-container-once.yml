@@ -1,0 +1,51 @@
+name: Publish verified HOTH container
+on:
+  push:
+    branches: [codex/hoth-publish-c78f98e2b0f9]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596: c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596
+      HOTH_IMAGE: ghcr.io/epsilonorigins/hoth:sha-c78f98e2b0f9
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596 }}
+          persist-credentials: false
+      - name: Build and verify the package
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596"
+          docker build --platform linux/amd64 --target package -f deploy/Dockerfile \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596" \
+            -t "$HOTH_IMAGE" .
+          bash deploy/smoke.sh
+      - name: Publish and verify the registry digest
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth_dir=$(mktemp -d)
+          trap 'rm -rf "$auth_dir"' EXIT
+          printf '%s\n' "$GHCR_TOKEN" | docker --config "$auth_dir" login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          docker --config "$auth_dir" push "$HOTH_IMAGE"
+          remote=$(docker --config "$auth_dir" buildx imagetools inspect "$HOTH_IMAGE")
+          printf '%s\n' "$remote"
+          digest=$(awk '/^Digest:/ {print $2; exit}' <<< "$remote")
+          [[ $digest =~ ^sha256:[[:xdigit:]]{64}$ ]]
+          repository=${HOTH_IMAGE%:*}
+          docker --config "$auth_dir" pull "$repository@$digest"
+          actual=$(docker image inspect "$repository@$digest" \
+            --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+          test "$actual" = "$HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596"
+          printf 'Published %s@%s from %s\n' "$repository" "$digest" "$HOTH_c78f98e2b0f9d7e2e989d95f4f0494ed1b84a596" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
