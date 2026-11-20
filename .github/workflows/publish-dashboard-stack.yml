@@ -1,0 +1,68 @@
+name: Publish HOTH simulator and dashboard
+on:
+  push:
+    branches: [codex/hoth-publish-stack-798dbe9b12bb]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_REVISION: 798dbe9b12bb96aa3e1d879feb1a78c0dbc2a36f
+      IMAGE_PREFIX: ghcr.io/epsilonorigins/hoth
+      IMAGE_TAG: sha-798dbe9b12bb
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.SOURCE_REVISION }}
+          persist-credentials: false
+      - name: Build simulator and dashboard
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+          for component in simulator dashboard; do
+            docker build --platform linux/amd64 --target "$component" -f deploy/Dockerfile \
+              --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+              --label "org.opencontainers.image.revision=$SOURCE_REVISION" \
+              --label "org.opencontainers.image.title=HOTH $component" \
+              -t "$IMAGE_PREFIX-$component:$IMAGE_TAG" .
+          done
+      - name: Verify the built Compose images
+        run: |
+          HOTH_SIMULATOR_IMAGE="$IMAGE_PREFIX-simulator:$IMAGE_TAG" \
+          HOTH_DASHBOARD_IMAGE="$IMAGE_PREFIX-dashboard:$IMAGE_TAG" \
+          HOTH_SKIP_BUILD=1 bash scripts/dashboard-e2e.sh
+      - name: Publish and pull both registry digests
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth=$(mktemp -d)
+          trap 'rm -rf "$auth"' EXIT
+          printf '%s\n' "$GHCR_TOKEN" | docker --config "$auth" login ghcr.io \
+            --username "$GITHUB_ACTOR" --password-stdin
+          for component in simulator dashboard; do
+            repository="$IMAGE_PREFIX-$component"
+            reference="$repository:$IMAGE_TAG"
+            if ! remote=$(docker --config "$auth" buildx imagetools inspect "$reference" 2>/dev/null); then
+              docker --config "$auth" push "$reference"
+              remote=$(docker --config "$auth" buildx imagetools inspect "$reference")
+            fi
+            digest=$(awk '/^Digest:/ {print $2; exit}' <<< "$remote")
+            [[ $digest =~ ^sha256:[[:xdigit:]]{64}$ ]]
+            pinned="$repository@$digest"
+            docker image rm "$reference"
+            docker --config "$auth" pull --platform linux/amd64 "$pinned"
+            revision=$(docker image inspect "$pinned" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')
+            platform=$(docker image inspect "$pinned" --format '{{.Os}}/{{.Architecture}}')
+            test "$revision" = "$SOURCE_REVISION"
+            test "$platform" = linux/amd64
+            printf 'HOTH_%s_IMAGE=%s\n' "${component^^}" "$pinned" >> "$GITHUB_ENV"
+            printf 'Published %s at %s (%s)\n' "$reference" "$pinned" "$platform" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Test the published digests in Compose
+        run: HOTH_SKIP_BUILD=1 bash scripts/dashboard-e2e.sh
