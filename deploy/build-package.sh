@@ -38,6 +38,5 @@ chmod -R a+rX /package/fixtures
     --config tests/fixtures/scenarios/standalone.yaml --output "$demo/mission.json"
 "$bin/hoth" scenario prepare --database "$demo/catalog.sqlite" \
     --config tests/fixtures/scenarios/globe.yaml --output "$demo/globe.json"
-"$bin/hoth-orbit-globe" --manifest "$demo/globe.json" --output "$globe/index.html" \
-    --norad 70000 --norad 70001 --norad 70002 --norad 70003
+"$bin/hoth-orbit-globe" --manifest "$demo/globe.json" --output "$globe/index.html"
 chmod 0644 "$demo/"* "$globe/index.html"

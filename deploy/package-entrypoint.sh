@@ -33,6 +33,8 @@ Container commands
   globe             Write the bundled globe HTML to stdout
   globe --manifest PATH --output PATH [--step-seconds SECONDS] [--norad ID]
                     Generate a globe for a prepared manifest
+  globe --manifest PATH --serve IP:PORT [--step-ms MS]
+                    Serve on-demand replay or add --zenoh IP:PORT --run-id ID for live telemetry
   validate-orbits   Run the offline propagation reference suite
   benchmark         Run the pipeline benchmark
 HELP

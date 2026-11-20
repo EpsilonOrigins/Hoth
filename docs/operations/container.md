@@ -7,7 +7,7 @@ docker build -f deploy/Dockerfile --target package -t hoth:local .
 docker run --rm -p 127.0.0.1:8080:8080 hoth:local
 ```
 
-Open `http://localhost:8080` to replay the bundled 95-minute fixture. The image includes the HOTH CLI, a prepared 100-object SQLite catalog and manifests, the globe generator, the compiled Vallado reference suite, and the benchmark and telemetry verifier. The builder compiles the artifacts and runs the reference suite. The runtime uses Debian slim as UID 10001 and serves the demo with BusyBox HTTP.
+Open `http://localhost:8080` to see all 100 satellites in the bundled 95-minute replay. The image includes the HOTH CLI, a prepared 100-object SQLite catalog and manifests, the globe generator, the compiled Vallado reference suite, and the benchmark and telemetry verifier. The builder compiles the artifacts and runs the reference suite. The runtime uses Debian slim as UID 10001 and serves the demo with BusyBox HTTP.
 
 ## Commands
 
@@ -26,6 +26,13 @@ The standalone fixture sends DIS to UDP port 3000 on container loopback. Use Com
 docker run --rm --network none \
   -v "$PWD/data:/data" hoth:local \
   globe --manifest /data/mission.json --output /data/custom-globe.html --norad 25544
+```
+
+Serve a high-resolution replay from the bundled manifest. The packaged globe binary also accepts the live Zenoh options for a router reachable from the container. [Globe modes](orbit-globe.md)
+
+```sh
+docker run --rm -p 127.0.0.1:8080:8080 hoth:local \
+  globe --manifest /opt/hoth/demo/globe.json --serve 0.0.0.0:8080 --step-ms 40
 ```
 
 ## Integration and deployment

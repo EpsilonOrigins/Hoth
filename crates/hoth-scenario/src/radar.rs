@@ -41,6 +41,16 @@ impl<'a> Radar<'a> {
         ]
     }
 
+    /// Converts a local east/north/up position in meters into ECEF meters.
+    pub fn ecef_position(&self, [east, north, up]: [f64; 3]) -> [f64; 3] {
+        let radial = self.cos_lat * up - self.sin_lat * north;
+        [
+            self.origin[0] + self.cos_lon * radial - self.sin_lon * east,
+            self.origin[1] + self.sin_lon * radial + self.cos_lon * east,
+            self.origin[2] + self.sin_lat * up + self.cos_lat * north,
+        ]
+    }
+
     pub fn contains(&self, pos: [f64; 3]) -> bool {
         self.could_intersect(pos, 0.0)
     }
@@ -100,5 +110,9 @@ mod tests {
         assert!(!radar.contains(local(0.0, 0.0, 10.0)));
         assert!(!radar.contains(local(0.0, 0.0, 2010.0)));
         assert!(radar.could_intersect(local(0.0, 0.0, 2010.0), 10.0));
+        assert_eq!(
+            radar.ecef_position([24.0, 30.0, 36.0]),
+            local(24.0, 30.0, 36.0)
+        );
     }
 }

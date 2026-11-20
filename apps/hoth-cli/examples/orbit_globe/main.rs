@@ -1,22 +1,28 @@
-//! Export sampled HOTH canonical states as a self-contained globe replay.
+//! Export or serve HOTH canonical states for the globe.
+
+mod radar;
+mod server;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use chrono::{SecondsFormat, TimeDelta};
+use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 use hoth_domain::state::{SimulationUtc, StateProvenance};
 use hoth_runtime::{Engine, RunResult};
-use hoth_scenario::Manifest;
+use hoth_scenario::{Manifest, Member};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     io::Write,
+    net::SocketAddr,
     path::{Path, PathBuf},
 };
 
 const MAX_POINTS: u64 = 500_000;
 const DEFAULT_STEP_SECONDS: u64 = 15;
-const USAGE: &str =
-    "Usage: orbit_globe --manifest PATH --output PATH [--step-seconds 15] [--norad ID ...]";
+const USAGE: &str = "Usage: orbit_globe --manifest PATH (--output PATH | --serve IP:PORT) [--step-seconds SECONDS] [--norad ID ...]
+       With --serve, use --step-ms MILLISECONDS for subsecond replay or --zenoh IP:PORT --run-id ID for live telemetry.";
+
+type Vectors = [f64; 6];
 
 #[derive(Serialize)]
 struct Replay {
@@ -27,6 +33,9 @@ struct Replay {
     offsets: Vec<u64>,
     times: Vec<String>,
     tracks: Vec<Track>,
+    radars: Vec<radar::Overlay>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timeline: Option<Timeline>,
 }
 
 #[derive(Serialize)]
@@ -34,16 +43,70 @@ struct Track {
     norad: u32,
     provenance: Option<StateProvenance>,
     // ECEF [x, y, z, vx, vy, vz] in meters and meters per second.
-    states: Vec<Option<[f64; 6]>>,
+    states: Vec<Option<Vectors>>,
 }
 
-fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunResult<Replay> {
-    let config = manifest.config()?;
-    let duration = config.time.duration_seconds.get();
+#[derive(Serialize)]
+struct Timeline {
+    start: DateTime<Utc>,
+    end: DateTime<Utc>,
+    duration_ms: u64,
+    step_ms: u64,
+    last: u64,
+    live: bool,
+}
+
+impl Timeline {
+    fn new(config: &hoth_config::ScenarioConfig, step_ms: u64, live: bool) -> RunResult<Self> {
+        if step_ms == 0 {
+            return Err("sample interval must be positive".into());
+        }
+        let duration_ms = config
+            .time
+            .duration_seconds
+            .get()
+            .checked_mul(1000)
+            .filter(|&duration| duration < (1_u64 << 53))
+            .ok_or("mission duration exceeds the browser's millisecond timeline range")?;
+        Ok(Self {
+            start: config.time.start_utc.instant(),
+            end: config.end_utc().instant(),
+            duration_ms,
+            step_ms: step_ms.min(duration_ms),
+            last: duration_ms.div_ceil(step_ms),
+            live,
+        })
+    }
+
+    fn time(&self, frame: u64) -> DateTime<Utc> {
+        let offset = frame.saturating_mul(self.step_ms).min(self.duration_ms);
+        self.start + TimeDelta::milliseconds(offset as i64)
+    }
+}
+
+fn sampling_plan(
+    duration: u64,
+    requested_step: Option<u64>,
+    satellite_count: u64,
+) -> RunResult<(u64, u64)> {
+    // Reserve slots for both endpoints. Increase the default interval before
+    // generating any states so large missions can preserve their membership.
+    let max_intervals = (MAX_POINTS / satellite_count).saturating_sub(1).max(1);
+    let step = requested_step.unwrap_or(DEFAULT_STEP_SECONDS.max(duration.div_ceil(max_intervals)));
     if step == 0 {
         return Err("--step-seconds must be positive".into());
     }
     let frame_count = duration.div_ceil(step) + 1;
+    let point_count = frame_count.saturating_mul(satellite_count);
+    if point_count > MAX_POINTS {
+        return Err(format!(
+            "export requires {point_count} points (limit {MAX_POINTS}); omit --step-seconds for automatic sampling, increase it, or select satellites with --norad"
+        ).into());
+    }
+    Ok((step, frame_count))
+}
+
+fn selected_members<'a>(manifest: &'a Manifest, ids: &BTreeSet<u32>) -> RunResult<Vec<&'a Member>> {
     let members = manifest.members();
     let selected: Vec<_> = members
         .iter()
@@ -57,12 +120,18 @@ fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunRes
             .collect();
         return Err(format!("NORAD IDs absent from manifest: {missing:?}").into());
     }
-    let point_count = frame_count.saturating_mul(selected.len() as u64);
-    if point_count > MAX_POINTS {
-        return Err(format!(
-            "export requires {point_count} points (limit {MAX_POINTS}); increase --step-seconds or select satellites with --norad"
-        ).into());
-    }
+    Ok(selected)
+}
+
+fn sample_mission(
+    manifest: &Manifest,
+    requested_step: Option<u64>,
+    ids: &BTreeSet<u32>,
+) -> RunResult<Replay> {
+    let config = manifest.config()?;
+    let duration = config.time.duration_seconds.get();
+    let selected = selected_members(manifest, ids)?;
+    let (step, frame_count) = sampling_plan(duration, requested_step, selected.len() as u64)?;
     let engine = Engine::new(
         selected
             .iter()
@@ -94,9 +163,7 @@ fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunRes
         engine.batch(SimulationUtc::new(utc), &mut states);
         for state in &states {
             let track = &mut tracks[track_indices[&state.norad_id.get()]];
-            let [x, y, z] = state.ecef.position_m.xyz();
-            let [vx, vy, vz] = state.ecef.velocity_m_per_s.xyz();
-            track.states[frame as usize] = Some([x, y, z, vx, vy, vz]);
+            track.states[frame as usize] = Some(vectors(state));
             track
                 .provenance
                 .get_or_insert_with(|| state.provenance.clone());
@@ -106,11 +173,19 @@ fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunRes
         name: config.name,
         snapshot: config.catalog.snapshot,
         digest: manifest.digest().to_owned(),
-        population: members.len(),
+        population: manifest.members().len(),
         offsets,
         times,
         tracks,
+        radars: config.radars.iter().map(radar::Overlay::new).collect(),
+        timeline: None,
     })
+}
+
+fn vectors(state: &hoth_domain::state::SatelliteState) -> Vectors {
+    let [x, y, z] = state.ecef.position_m.xyz();
+    let [vx, vy, vz] = state.ecef.velocity_m_per_s.xyz();
+    [x, y, z, vx, vy, vz]
 }
 
 fn write_replay(output: &Path, replay: &Replay) -> RunResult<()> {
@@ -119,6 +194,13 @@ fn write_replay(output: &Path, replay: &Replay) -> RunResult<()> {
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or(Path::new("."));
     let mut file = tempfile::NamedTempFile::new_in(parent)?;
+    write_page(&mut file, replay)?;
+    file.persist_noclobber(output)
+        .map_err(|error| format!("write {}: {}", output.display(), error.error))?;
+    Ok(())
+}
+
+fn write_page(mut file: impl Write, replay: &Replay) -> RunResult<()> {
     // Prevent a scenario name or provenance field from closing the JSON script.
     let data = serde_json::to_string(replay)?.replace('<', "\\u003c");
     let earth = STANDARD.encode(include_bytes!("earth.jpg"));
@@ -140,18 +222,21 @@ fn write_replay(output: &Path, replay: &Replay) -> RunResult<()> {
     )?;
     writeln!(
         file,
-        "<script>{}</script>\n</body>\n</html>",
-        include_str!("viewer.js")
+        "<script>{}\n{}</script>\n</body>\n</html>",
+        include_str!("reference.js"),
+        include_str!("viewer.js"),
     )?;
-    file.persist_noclobber(output)
-        .map_err(|error| format!("write {}: {}", output.display(), error.error))?;
     Ok(())
 }
 
 fn run() -> RunResult<()> {
     let mut manifest = None;
     let mut output = None;
-    let mut step = None;
+    let mut address: Option<SocketAddr> = None;
+    let mut router: Option<SocketAddr> = None;
+    let mut run_id = None;
+    let mut step: Option<u64> = None;
+    let mut step_ms: Option<u64> = None;
     let mut norad = BTreeSet::new();
     let mut args = std::env::args_os().skip(1);
     while let Some(flag) = args.next() {
@@ -163,8 +248,20 @@ fn run() -> RunResult<()> {
         match flag.to_str() {
             Some("--manifest") if manifest.is_none() => manifest = Some(PathBuf::from(value)),
             Some("--output") if output.is_none() => output = Some(PathBuf::from(value)),
+            Some("--serve") if address.is_none() => {
+                address = Some(value.to_str().ok_or("invalid --serve address")?.parse()?);
+            }
+            Some("--zenoh") if router.is_none() => {
+                router = Some(value.to_str().ok_or("invalid --zenoh address")?.parse()?);
+            }
+            Some("--run-id") if run_id.is_none() => {
+                run_id = Some(value.into_string().map_err(|_| "invalid --run-id")?);
+            }
             Some("--step-seconds") if step.is_none() => {
                 step = Some(value.to_str().ok_or("invalid --step-seconds")?.parse()?);
+            }
+            Some("--step-ms") if step_ms.is_none() => {
+                step_ms = Some(value.to_str().ok_or("invalid --step-ms")?.parse()?);
             }
             Some("--norad") => {
                 let id = value.to_str().ok_or("invalid NORAD ID")?.parse()?;
@@ -178,9 +275,24 @@ fn run() -> RunResult<()> {
         }
     }
     let manifest = manifest.ok_or("provide --manifest PATH")?;
-    let output = output.ok_or("provide --output PATH")?;
+    if output.is_some() == address.is_some() {
+        return Err("provide exactly one of --output PATH or --serve IP:PORT".into());
+    }
+    if step_ms.is_some() && (step.is_some() || address.is_none()) {
+        return Err("--step-ms requires --serve and replaces --step-seconds".into());
+    }
+    let live = match (router, run_id) {
+        (Some(router), Some(run_id)) if address.is_some() => Some((router, run_id)),
+        (None, None) => None,
+        _ => return Err("--zenoh and --run-id must be provided together with --serve".into()),
+    };
     let manifest = Manifest::decode(&fs::read(manifest)?)?;
-    let replay = sample_mission(&manifest, step.unwrap_or(DEFAULT_STEP_SECONDS), &norad)?;
+    if let Some(address) = address {
+        let interval = step_ms.unwrap_or_else(|| step.unwrap_or(1).saturating_mul(1000));
+        return server::serve(address, &manifest, &norad, interval, live);
+    }
+    let output = output.expect("output was validated");
+    let replay = sample_mission(&manifest, step, &norad)?;
     write_replay(&output, &replay)?;
     println!(
         "Wrote {} ({} satellites, {} samples each)",
@@ -204,7 +316,7 @@ mod tests {
     use hoth_catalog::{offline, schema};
     use hoth_dis::Registry;
 
-    fn fixture() -> Manifest {
+    pub(super) fn fixture() -> Manifest {
         let mut db = rusqlite::Connection::open_in_memory().unwrap();
         schema::migrate(&mut db).unwrap();
         offline::import_elements(
@@ -227,7 +339,7 @@ mod tests {
     #[test]
     fn samples_match_runtime_and_include_exact_end() {
         let manifest = fixture();
-        let replay = sample_mission(&manifest, 15, &BTreeSet::new()).unwrap();
+        let replay = sample_mission(&manifest, None, &BTreeSet::new()).unwrap();
         assert_eq!(replay.offsets, [0, 15, 30, 41]);
         let engine = Engine::load(&manifest).unwrap();
         assert_eq!(replay.tracks[0].norad, 25544);
@@ -243,7 +355,31 @@ mod tests {
                 Some(&states[0].provenance)
             );
         }
-        assert!(sample_mission(&manifest, 15, &BTreeSet::from([9])).is_err());
-        assert!(sample_mission(&manifest, 0, &BTreeSet::new()).is_err());
+        assert!(sample_mission(&manifest, Some(15), &BTreeSet::from([9])).is_err());
+        assert!(sample_mission(&manifest, Some(0), &BTreeSet::new()).is_err());
+    }
+
+    #[test]
+    fn automatic_sampling_keeps_large_populations_within_budget() {
+        assert_eq!(sampling_plan(5700, None, 100).unwrap(), (15, 381));
+        assert_eq!(sampling_plan(5700, None, 15_000).unwrap(), (179, 33));
+        assert_eq!(sampling_plan(5700, None, 50_000).unwrap(), (634, 10));
+        assert_eq!(sampling_plan(5700, Some(10), 100).unwrap(), (10, 571));
+        let error = sampling_plan(5700, Some(15), 15_000).unwrap_err();
+        assert!(error.to_string().contains("limit 500000"));
+    }
+
+    #[test]
+    fn served_timeline_keeps_subsecond_steps_and_exact_endpoint() {
+        let config = fixture().config().unwrap();
+        let timeline = Timeline::new(&config, 60, false).unwrap();
+        assert_eq!(timeline.last, 684);
+        assert_eq!(
+            timeline.time(1) - timeline.start,
+            TimeDelta::milliseconds(60)
+        );
+        assert_eq!((timeline.end - timeline.time(683)).num_milliseconds(), 20);
+        assert_eq!(timeline.time(684), config.end_utc().instant());
+        assert!(Timeline::new(&config, 0, false).is_err());
     }
 }

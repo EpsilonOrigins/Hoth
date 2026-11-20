@@ -50,7 +50,7 @@ The fixture publishes 100 satellites. Generate an interactive globe from the sam
 
 ## Reference
 
-- Inspect satellite trajectories on an offline globe. [Orbit test harness](docs/operations/orbit-globe.md)
+- Replay satellite trajectories, follow live Zenoh telemetry, and compare reference orbits on the globe. [Orbit test harness](docs/operations/orbit-globe.md)
 - Catalog storage, acquisition and export. [SQLite catalog](docs/architecture/catalog.md) · [Space-Track](docs/architecture/space-track.md)
 - Configuration, initialization, frames and selection. [YAML v1](docs/interfaces/scenario-yaml.md) · [Orbit and manifest ADR](docs/decisions/0007-manifest-orbit-policy.md)
 - Local controller and dual publishing. [Execution Fabric](docs/architecture/fabric-integration.md) · [Runtime ADR](docs/decisions/0008-runtime-and-control.md)

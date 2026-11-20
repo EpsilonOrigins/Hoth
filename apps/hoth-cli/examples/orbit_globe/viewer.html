@@ -23,7 +23,7 @@
         <p id="mission-name" class="mission-name"></p>
       </div>
       <div class="heading-actions">
-        <span class="mode"><span aria-hidden="true"></span>Offline replay</span>
+        <span class="mode"><span aria-hidden="true"></span><b id="mode">Offline replay</b></span>
         <button type="button" class="button" id="download">Download CSV</button>
       </div>
     </div>
@@ -31,7 +31,7 @@
     <div class="workspace">
       <section class="card replay" aria-label="Orbit replay">
         <div class="viewport" id="viewport">
-          <canvas id="globe" tabindex="0" aria-label="Earth-fixed globe. Arrow keys rotate. Plus and minus zoom.">
+          <canvas id="globe" tabindex="0" aria-label="Earth-fixed globe. Drag or use arrow keys to rotate. Plus and minus zoom.">
             This replay needs a browser with Canvas support.
           </canvas>
           <div class="frame-chip"><span class="frame-icon" aria-hidden="true">⊕</span> EARTH FIXED <span>ECEF</span></div>
@@ -39,19 +39,23 @@
             <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
             <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
             <button type="button" id="center" aria-label="Center on satellite" title="Center on satellite">⌖</button>
+            <button type="button" id="fit-all" aria-label="Fit all satellites" title="Fit all satellites">⊡</button>
           </div>
-          <div class="viewport-footer">
-            <div class="layers" aria-label="Globe layers">
-              <label title="Show orbital trajectory"><input id="orbit-layer" type="checkbox" checked><span class="legend-line"></span>Orbit</label>
-              <label title="Show projection onto Earth's surface"><input id="ground-layer" type="checkbox" checked><span class="legend-line dashed"></span>Ground track</label>
-            </div>
-            <span class="drag-hint">Drag to rotate</span>
+        </div>
+        <div class="viewport-footer">
+          <div class="layers" aria-label="Globe layers">
+            <label title="Show selected satellite's orbital trajectory"><input id="orbit-layer" type="checkbox" checked><span class="legend-line"></span><span id="orbit-label">Selected orbit</span></label>
+            <label title="Show projection onto Earth's surface"><input id="ground-layer" type="checkbox" checked><span class="legend-line dashed"></span>Ground track</label>
+            <label title="Show satellites behind Earth as hollow markers"><input id="far-layer" type="checkbox" checked><span class="legend-dot"></span>Behind Earth</label>
+            <label id="radar-control" title="Show scenario radar field-of-view volumes" hidden><input id="radar-layer" type="checkbox" checked><span class="legend-line radar"></span>Radar coverage</label>
+            <label id="reference-control" title="Show the loaded reference trajectory" hidden><input id="reference-layer" type="checkbox" checked><span class="legend-line reference"></span>Reference orbit</label>
           </div>
+          <span id="shown-count" class="shown-count"></span>
         </div>
 
         <div class="timeline">
           <div class="timeline-top">
-            <div class="transport">
+            <div class="transport" id="transport">
               <button class="icon-button" id="previous" type="button" aria-label="Previous sample" title="Previous sample">‹</button>
               <button class="play" id="play" type="button" aria-label="Play" title="Play"><span aria-hidden="true"></span></button>
               <button class="icon-button" id="next" type="button" aria-label="Next sample" title="Next sample">›</button>
@@ -68,6 +72,7 @@
           </div>
           <input id="timeline" type="range" min="0" value="0" step="1" aria-label="Simulation sample">
           <div class="timeline-labels"><span id="first-time"></span><span id="sample-count"></span><span id="last-time"></span></div>
+          <p id="source-status" class="source-status" role="status" hidden></p>
         </div>
       </section>
 
@@ -102,7 +107,7 @@
         </section>
 
         <section class="state-section provenance" aria-label="Orbital provenance">
-          <h3>Orbital provenance</h3>
+          <h3 id="provenance-heading">Orbital provenance</h3>
           <dl>
             <div><dt>Catalog snapshot</dt><dd id="snapshot">—</dd></div>
             <div><dt>Initialization</dt><dd id="initialization">—</dd></div>
@@ -110,8 +115,18 @@
             <div><dt>Manifest SHA-256</dt><dd id="digest">—</dd></div>
           </dl>
         </section>
+        <section class="state-section reference-section" aria-label="Reference orbit comparison">
+          <h3>Reference comparison</h3>
+          <label for="reference-file" class="field-label">Reference ECEF CSV</label>
+          <input id="reference-file" type="file" accept=".csv,text/csv">
+          <p id="reference-status" class="source-status" role="status" hidden></p>
+          <dl id="reference-errors" class="coordinates" hidden>
+            <div><dt>Position error</dt><dd id="position-error"></dd></div>
+            <div><dt>Velocity error</dt><dd id="velocity-error"></dd></div>
+          </dl>
+        </section>
       </aside>
     </div>
 
-    <footer class="notes"><span>Sampled simulation states</span><span>Earth imagery from the Three.js texture library</span></footer>
+    <footer class="notes"><span id="mode-note">Sampled simulation states</span><span>Earth imagery from the Three.js texture library</span></footer>
   </main>

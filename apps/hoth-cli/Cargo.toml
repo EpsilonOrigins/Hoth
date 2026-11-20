@@ -27,3 +27,4 @@ zenoh = { version = "=1.7.2", default-features = false, features = ["transport_t
 base64 = "0.23"
 serde = { version = "1", features = ["derive"] }
 socket2 = "0.6"
+tiny_http = "0.12"
