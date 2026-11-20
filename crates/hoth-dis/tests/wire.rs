@@ -1,4 +1,4 @@
-use hoth_dis::{encode, Entity, EntityId, Registry, UdpPublisher};
+use hoth_dis::{encode, Entity, EntityId, EntityStatePdu, Registry, UdpPublisher};
 use hoth_domain::state::SatelliteState;
 use hoth_publisher::{PublishError, Publisher};
 use std::{collections::BTreeMap, net::UdpSocket, time::Duration};
@@ -25,6 +25,30 @@ fn entity() -> Entity {
 fn dis_entity_state_matches_opendis_golden_packet() {
     let state: SatelliteState = serde_json::from_str(STATE).unwrap();
     assert_eq!(encode(&state, entity(), 37), OPEN_DIS);
+}
+
+#[test]
+fn wire_inspector_decodes_opendis_and_rejects_malformed_datagrams() {
+    let state: SatelliteState = serde_json::from_str(STATE).unwrap();
+    let pdu = EntityStatePdu::decode(OPEN_DIS).unwrap();
+    assert_eq!(pdu.entity_id, entity().id);
+    assert_eq!(pdu.entity_type, entity().entity_type);
+    assert_eq!(pdu.marking, "100001");
+    assert_eq!(pdu.exercise_id, 37);
+    assert_eq!(pdu.length_bytes, 144);
+    assert!(pdu.timestamp_absolute);
+    assert_eq!(pdu.position_ecef_m, state.ecef.position_m.xyz());
+    assert_eq!(
+        pdu.velocity_ecef_m_per_s,
+        state.ecef.velocity_m_per_s.xyz().map(|axis| axis as f32)
+    );
+    assert_eq!(pdu.dead_reckoning_algorithm, 2);
+    assert!(EntityStatePdu::decode(&OPEN_DIS[..143]).is_err());
+    let mut packet = OPEN_DIS.to_vec();
+    packet[48..56].copy_from_slice(&f64::NAN.to_be_bytes());
+    assert!(EntityStatePdu::decode(&packet).is_err());
+    packet[0] = 6;
+    assert!(EntityStatePdu::decode(&packet).is_err());
 }
 
 #[test]

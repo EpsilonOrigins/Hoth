@@ -4,7 +4,15 @@ HOTH generates reproducible orbital telemetry for local and distributed simulati
 
 ## Run locally
 
-### Docker
+### Docker Compose dashboard
+
+```sh
+docker compose up --build
+```
+
+Open `http://127.0.0.1:8080` for the live globe and DIS 7 wire monitor. The dashboard runs in its own container. Edit the mounted scenario to change radar fields of view and simulation start time. [Compose dashboard guide](docs/operations/dashboard.md)
+
+### Docker package
 
 Build the container and open the bundled globe at `http://localhost:8080`.
 

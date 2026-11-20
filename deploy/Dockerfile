@@ -33,6 +33,21 @@ FROM runtime AS production
 COPY --from=builder /package/usr/local/bin/hoth /usr/local/bin/hoth
 ENTRYPOINT ["/usr/local/bin/hoth"]
 
+FROM production AS simulator
+USER root
+RUN install -d -o 10001 -g 10001 /mission
+COPY --chmod=0755 deploy/run-dashboard-simulation.sh /usr/local/bin/run-dashboard-simulation
+COPY --chmod=0644 tests/fixtures/catalog/population.json /opt/hoth/population.json
+COPY --from=web-server /bin/busybox /usr/local/bin/busybox
+USER 10001:10001
+ENTRYPOINT ["/usr/local/bin/run-dashboard-simulation"]
+
+FROM runtime AS dashboard
+COPY --from=builder /package/usr/local/bin/hoth-orbit-globe /usr/local/bin/hoth-orbit-globe
+COPY --from=web-server /bin/busybox /usr/local/bin/busybox
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/hoth-orbit-globe"]
+
 FROM runtime AS package
 COPY --from=builder /package/ /
 COPY --from=web-server /bin/busybox /usr/local/bin/busybox

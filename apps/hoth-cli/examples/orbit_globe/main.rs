@@ -2,6 +2,7 @@
 
 mod radar;
 mod server;
+mod wire;
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
@@ -20,7 +21,8 @@ use std::{
 const MAX_POINTS: u64 = 500_000;
 const DEFAULT_STEP_SECONDS: u64 = 15;
 const USAGE: &str = "Usage: orbit_globe --manifest PATH (--output PATH | --serve IP:PORT) [--step-seconds SECONDS] [--norad ID ...]
-       With --serve, use --step-ms MILLISECONDS for subsecond replay or --zenoh IP:PORT --run-id ID for live telemetry.";
+       With --serve, use --step-ms MILLISECONDS for subsecond replay or --zenoh IP:PORT --run-id ID for live telemetry.
+       Add --dis-listen IP:PORT to inspect DIS 7 Entity State UDP datagrams.";
 
 type Vectors = [f64; 6];
 
@@ -34,6 +36,7 @@ struct Replay {
     times: Vec<String>,
     tracks: Vec<Track>,
     radars: Vec<radar::Overlay>,
+    wire_monitor: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     timeline: Option<Timeline>,
 }
@@ -178,6 +181,7 @@ fn sample_mission(
         times,
         tracks,
         radars: config.radars.iter().map(radar::Overlay::new).collect(),
+        wire_monitor: false,
         timeline: None,
     })
 }
@@ -222,9 +226,10 @@ fn write_page(mut file: impl Write, replay: &Replay) -> RunResult<()> {
     )?;
     writeln!(
         file,
-        "<script>{}\n{}</script>\n</body>\n</html>",
+        "<script>{}\n{}\n{}</script>\n</body>\n</html>",
         include_str!("reference.js"),
         include_str!("viewer.js"),
+        include_str!("wire.js"),
     )?;
     Ok(())
 }
@@ -234,6 +239,7 @@ fn run() -> RunResult<()> {
     let mut output = None;
     let mut address: Option<SocketAddr> = None;
     let mut router: Option<SocketAddr> = None;
+    let mut dis_listen: Option<SocketAddr> = None;
     let mut run_id = None;
     let mut step: Option<u64> = None;
     let mut step_ms: Option<u64> = None;
@@ -253,6 +259,14 @@ fn run() -> RunResult<()> {
             }
             Some("--zenoh") if router.is_none() => {
                 router = Some(value.to_str().ok_or("invalid --zenoh address")?.parse()?);
+            }
+            Some("--dis-listen") if dis_listen.is_none() => {
+                dis_listen = Some(
+                    value
+                        .to_str()
+                        .ok_or("invalid --dis-listen address")?
+                        .parse()?,
+                );
             }
             Some("--run-id") if run_id.is_none() => {
                 run_id = Some(value.into_string().map_err(|_| "invalid --run-id")?);
@@ -281,6 +295,9 @@ fn run() -> RunResult<()> {
     if step_ms.is_some() && (step.is_some() || address.is_none()) {
         return Err("--step-ms requires --serve and replaces --step-seconds".into());
     }
+    if dis_listen.is_some() && address.is_none() {
+        return Err("--dis-listen requires --serve".into());
+    }
     let live = match (router, run_id) {
         (Some(router), Some(run_id)) if address.is_some() => Some((router, run_id)),
         (None, None) => None,
@@ -289,7 +306,7 @@ fn run() -> RunResult<()> {
     let manifest = Manifest::decode(&fs::read(manifest)?)?;
     if let Some(address) = address {
         let interval = step_ms.unwrap_or_else(|| step.unwrap_or(1).saturating_mul(1000));
-        return server::serve(address, &manifest, &norad, interval, live);
+        return server::serve(address, &manifest, &norad, interval, live, dis_listen);
     }
     let output = output.expect("output was validated");
     let replay = sample_mission(&manifest, step, &norad)?;
