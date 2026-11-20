@@ -29,14 +29,32 @@ fi
     hoth-container serve-globe &
     server=$!
     trap "kill $server 2>/dev/null || true" EXIT
+    served=false
     for attempt in 1 2 3 4 5; do
         if busybox wget -Y off -T 1 -q -O /tmp/served.html http://127.0.0.1:8080/ 2>/dev/null; then
             cmp /tmp/served.html /tmp/exported.html
+            served=true
+            break
+        fi
+        sleep 1
+    done
+    if ! "$served"; then
+        printf "Globe HTTP server did not respond\n" >&2
+        exit 1
+    fi
+    kill "$server"
+    wait "$server" || true
+    hoth-container globe --manifest /opt/hoth/demo/globe.json --serve 127.0.0.1:8080 --step-ms 40 &
+    server=$!
+    trap "kill $server 2>/dev/null || true" EXIT
+    for attempt in 1 2 3 4 5; do
+        if busybox wget -Y off -T 1 -q -O /tmp/frame.json http://127.0.0.1:8080/api/frame/1 2>/dev/null; then
+            grep -qF "2026-11-17T00:00:00.040Z" /tmp/frame.json
             exit 0
         fi
         sleep 1
     done
-    printf "Globe HTTP server did not respond\n" >&2
+    printf "On-demand replay server did not respond\n" >&2
     exit 1
 '
 printf 'Container smoke passed (nonroot CLI, offline reference, runtime, benchmark and globe).\n'

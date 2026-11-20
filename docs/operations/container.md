@@ -28,6 +28,13 @@ docker run --rm --network none \
   globe --manifest /data/mission.json --output /data/custom-globe.html --norad 25544
 ```
 
+Serve a high-resolution replay from the bundled manifest. The packaged globe binary also accepts the live Zenoh options for a router reachable from the container. [Globe modes](orbit-globe.md)
+
+```sh
+docker run --rm -p 127.0.0.1:8080:8080 hoth:local \
+  globe --manifest /opt/hoth/demo/globe.json --serve 0.0.0.0:8080 --step-ms 40
+```
+
 ## Integration and deployment
 
 The Compose harness uses the same package image for the runtime and verifier. It starts a local Zenoh router, checks both transports and controller playback, and returns nonzero if either required container fails. The smoke script also verifies the packaged commands on an isolated network.

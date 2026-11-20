@@ -1,0 +1,11 @@
+schema_version: 1
+name: Vallado Vanguard 1 verification
+catalog: {snapshot: "2000-06"}
+time:
+  start_utc: "2000-06-27T18:50:19.733568Z"
+  duration_seconds: 86400
+  clock: standalone
+  rate: 1
+selection: {mode: all}
+publishers:
+  - {type: dis, destination: "127.0.0.1:3000", rate_hz: 25}
