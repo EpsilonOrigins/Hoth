@@ -1,0 +1,84 @@
+name: hoth-dashboard
+
+services:
+  zenoh:
+    image: eclipse/zenoh:1.7.2
+    command: ["-l", "tcp/0.0.0.0:7447"]
+    networks:
+      sim:
+        ipv4_address: ${HOTH_ZENOH_IP:-172.29.187.10}
+
+  hoth:
+    image: ${HOTH_SIMULATOR_IMAGE:-hoth:simulator}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: simulator
+    environment:
+      HOTH_RUN_ID: ${HOTH_RUN_ID:-dashboard}
+      HOTH_DASHBOARD_IP: ${HOTH_DASHBOARD_IP:-172.29.187.12}
+      HOTH_ELEMENTS_PATH: ${HOTH_ELEMENTS_PATH:-}
+      HOTH_ELEMENTS_FORMAT: ${HOTH_ELEMENTS_FORMAT:-omm-json}
+    depends_on:
+      zenoh:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: ${HOTH_INPUT_DIR:-./deploy/dashboard-inputs}
+        target: /inputs
+        read_only: true
+        bind:
+          create_host_path: false
+      - mission:/mission
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/hoth-manifest.ready"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    networks: [sim]
+
+  dashboard:
+    image: ${HOTH_DASHBOARD_IMAGE:-hoth:dashboard}
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+      target: dashboard
+    command:
+      - --manifest
+      - /mission/manifest.json
+      - --serve
+      - 0.0.0.0:8080
+      - --zenoh
+      - "${HOTH_ZENOH_IP:-172.29.187.10}:7447"
+      - --run-id
+      - ${HOTH_RUN_ID:-dashboard}
+      - --dis-listen
+      - 0.0.0.0:3000
+    depends_on:
+      hoth:
+        condition: service_healthy
+        restart: true
+    volumes: ["mission:/mission:ro"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "busybox", "wget", "-Y", "off", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 1s
+      timeout: 2s
+      retries: 20
+    ports: ["127.0.0.1:${HOTH_DASHBOARD_PORT:-8080}:8080"]
+    networks:
+      sim:
+        ipv4_address: ${HOTH_DASHBOARD_IP:-172.29.187.12}
+
+networks:
+  sim:
+    ipam:
+      config:
+        - subnet: ${HOTH_SIM_SUBNET:-172.29.187.0/24}
+
+volumes:
+  mission:

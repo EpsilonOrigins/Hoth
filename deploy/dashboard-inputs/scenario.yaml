@@ -1,0 +1,38 @@
+schema_version: 1
+name: Engineering dashboard mission
+catalog:
+  snapshot: "2021-11"
+time:
+  start_utc: "2026-11-17T00:00:00Z"
+  duration_seconds: 600
+  clock: standalone
+  rate: 1.0
+selection:
+  mode: all
+radars:
+  - id: gulf-radar
+    latitude_deg: 28.1
+    longitude_deg: -90.2
+    altitude_m: 25
+    azimuth_min_deg: 15
+    azimuth_max_deg: 155
+    elevation_min_deg: 5
+    elevation_max_deg: 75
+    range_min_m: 20000
+    range_max_m: 1700000
+  - id: north-radar
+    latitude_deg: 76.5
+    longitude_deg: -68.7
+    altitude_m: 180
+    azimuth_min_deg: 230
+    azimuth_max_deg: 30
+    elevation_min_deg: 8
+    elevation_max_deg: 75
+    range_max_m: 2000000
+dis:
+  exercise_id: 37
+  site: 5
+  application: 12
+publishers:
+  - {type: dis, destination: "172.29.187.12:3000", rate_hz: 25}
+  - {type: zenoh, destination: "172.29.187.10:7447", rate_hz: 25}

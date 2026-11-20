@@ -189,6 +189,7 @@ pub fn offline(command: &str, args: &[OsString]) -> Result<(), Box<dyn Error>> {
         "metadata" => &["--file", "--source", "--acquired-at", "--database"],
         "snapshot" => &[
             "--month",
+            "--config",
             "--start",
             "--end",
             "--max-age-days",
@@ -242,10 +243,26 @@ pub fn offline(command: &str, args: &[OsString]) -> Result<(), Box<dyn Error>> {
             println!("Processed {count} {command} records");
         }
         "snapshot" => {
-            let months = match (text("--month"), text("--start"), text("--end")) {
-                (Some(month), None, None) => vec![month.to_owned()],
-                (None, Some(start), Some(end)) => offline::months(start, end)?,
-                _ => return Err("provide --month or both --start and --end (exclusive)".into()),
+            let months = match (
+                options.contains_key("--config"),
+                text("--month"),
+                text("--start"),
+                text("--end"),
+            ) {
+                (true, None, None, None) => {
+                    let config = hoth_config::ScenarioConfig::from_yaml(&fs::read_to_string(
+                        file("--config")?,
+                    )?)?;
+                    vec![config.catalog.snapshot]
+                }
+                (false, Some(month), None, None) => vec![month.to_owned()],
+                (false, None, Some(start), Some(end)) => offline::months(start, end)?,
+                _ => {
+                    return Err(
+                        "provide --config PATH, --month, or both --start and --end (exclusive)"
+                            .into(),
+                    )
+                }
             };
             let max_age = text("--max-age-days").unwrap_or("17").parse()?;
             if !database.is_file() {

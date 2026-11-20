@@ -24,6 +24,7 @@
       </div>
       <div class="heading-actions">
         <span class="mode"><span aria-hidden="true"></span><b id="mode">Offline replay</b></span>
+        <a id="wire-nav" class="button" href="#wire-monitor" hidden>Wire monitor</a>
         <button type="button" class="button" id="download">Download CSV</button>
       </div>
     </div>
@@ -127,6 +128,34 @@
         </section>
       </aside>
     </div>
+
+    <section class="card wire-monitor" id="wire-monitor" aria-labelledby="wire-heading" hidden>
+      <div class="wire-heading">
+        <div>
+          <h2 id="wire-heading">DIS 7 wire monitor</h2>
+          <p id="wire-status" class="source-status" role="status">Waiting for UDP datagrams</p>
+        </div>
+        <button id="wire-freeze" class="button" type="button" aria-pressed="false" disabled>Freeze packet</button>
+      </div>
+      <dl class="coordinates wire-counts">
+        <div><dt>Accepted PDUs</dt><dd id="wire-accepted">0</dd></div>
+        <div><dt>Entities seen</dt><dd id="wire-entities">0</dd></div>
+        <div><dt>Ignored datagrams</dt><dd id="wire-ignored">0</dd></div>
+      </dl>
+      <div id="wire-packet" hidden>
+        <dl class="wire-identifiers">
+          <div><dt>NORAD</dt><dd id="wire-norad"></dd></div>
+          <div><dt>DIS entity</dt><dd id="wire-entity"></dd></div>
+          <div><dt>Exercise</dt><dd id="wire-exercise"></dd></div>
+          <div><dt>UDP source</dt><dd id="wire-source"></dd></div>
+          <div><dt>Received UTC</dt><dd id="wire-received"></dd></div>
+        </dl>
+        <div class="wire-data">
+          <div><h3>Decoded Entity State PDU</h3><pre id="wire-decoded" tabindex="0"></pre></div>
+          <div><h3>Raw UDP payload</h3><pre id="wire-hex" tabindex="0"></pre></div>
+        </div>
+      </div>
+    </section>
 
     <footer class="notes"><span id="mode-note">Sampled simulation states</span><span>Earth imagery from the Three.js texture library</span></footer>
   </main>

@@ -1,4 +1,6 @@
-use super::{radar, selected_members, vectors, write_page, Replay, Timeline, Track, Vectors};
+use super::{
+    radar, selected_members, vectors, wire::WireTap, write_page, Replay, Timeline, Track, Vectors,
+};
 use chrono::{DateTime, SecondsFormat, Utc};
 use hoth_domain::state::SimulationUtc;
 use hoth_orbits::{EarthRotation, Propagator};
@@ -134,6 +136,7 @@ pub fn serve(
     ids: &BTreeSet<u32>,
     step_ms: u64,
     live: Option<(SocketAddr, String)>,
+    dis_listen: Option<SocketAddr>,
 ) -> RunResult<()> {
     let config = manifest.config()?;
     let timeline = Timeline::new(&config, step_ms, live.is_some())?;
@@ -162,6 +165,7 @@ pub fn serve(
             })
             .collect(),
         radars: config.radars.iter().map(radar::Overlay::new).collect(),
+        wire_monitor: dis_listen.is_some(),
         timeline: Some(timeline),
     };
     let mut html = Vec::new();
@@ -179,6 +183,9 @@ pub fn serve(
     let mut feed = live
         .map(|(address, run)| Feed::connect(address, run))
         .transpose()?;
+    let wire = dis_listen
+        .map(|ip| WireTap::listen(ip, manifest, config.dis.exercise_id))
+        .transpose()?;
     let listener = Server::http(address).map_err(|error| error.to_string())?;
     println!("Globe listening on http://{}/", listener.server_addr());
     let timeline = replay.timeline.as_ref().expect("served replay timeline");
@@ -190,7 +197,7 @@ pub fn serve(
             timeline,
             &propagators,
             &mut simulator,
-            feed.as_mut(),
+            (feed.as_mut(), wire.as_ref()),
         ) {
             eprintln!("globe request failed: {error}");
         }
@@ -226,7 +233,7 @@ fn respond(
     timeline: &Timeline,
     propagators: &[Propagator],
     simulator: &mut Simulator,
-    feed: Option<&mut Feed>,
+    (feed, wire): (Option<&mut Feed>, Option<&WireTap>),
 ) -> RunResult<()> {
     let index = |prefix| {
         let norad = argument::<u32>(&request, prefix)?;
@@ -240,6 +247,10 @@ fn respond(
         request.respond(
             Response::from_data(html).with_header(content_type("text/html; charset=utf-8")),
         )?;
+    } else if request.url() == "/healthz" {
+        request.respond(Response::empty(200))?;
+    } else if let Some((wire, norad)) = wire.zip(argument(&request, "/api/dis/")) {
+        json(request, serde_json::to_vec(&wire.snapshot(norad))?)?;
     } else if let Some(feed) = feed.filter(|_| request.url() == "/api/live") {
         let data = feed.snapshot(tracks, timeline);
         match data {

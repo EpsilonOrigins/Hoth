@@ -1,6 +1,9 @@
 //! DIS 7 Entity State encoding and UDP transport.
 
 mod datagrams;
+mod decode;
+
+pub use decode::EntityStatePdu;
 
 use hoth_domain::state::{SatelliteState, SimulationUtc};
 use hoth_publisher::{PublishError, Publisher};

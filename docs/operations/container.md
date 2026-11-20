@@ -1,5 +1,7 @@
 # HOTH container package
 
+Use the repository's root Compose file to run the simulator and engineering dashboard in separate containers. [Dashboard setup and input mounts](dashboard.md)
+
 Build the package from the repository root with Docker BuildKit.
 
 ```sh
