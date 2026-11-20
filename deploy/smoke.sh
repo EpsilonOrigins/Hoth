@@ -23,7 +23,9 @@ fi
     hoth-container globe --manifest /opt/hoth/demo/globe.json \
         --output /tmp/generated.html --norad 70001
     grep -qF "HOTH Orbit Test Harness" /tmp/generated.html
+    test "$(grep -oF "\"norad\":" /tmp/generated.html | wc -l)" -eq 1
     hoth-container globe > /tmp/exported.html
+    test "$(grep -oF "\"norad\":" /tmp/exported.html | wc -l)" -eq 100
     hoth-container serve-globe &
     server=$!
     trap "kill $server 2>/dev/null || true" EXIT

@@ -22,5 +22,4 @@ if [[ -e $output || -L $output ]]; then
     output="$(mktemp -d data/orbit-globe.XXXXXX)/index.html"
 fi
 cargo run --locked --quiet -p hoth --example orbit_globe -- \
-    --manifest "$fixture/mission.json" --output "$output" \
-    --norad 70000 --norad 70001 --norad 70002 --norad 70003
+    --manifest "$fixture/mission.json" --output "$output"

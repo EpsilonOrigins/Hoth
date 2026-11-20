@@ -31,7 +31,7 @@
     <div class="workspace">
       <section class="card replay" aria-label="Orbit replay">
         <div class="viewport" id="viewport">
-          <canvas id="globe" tabindex="0" aria-label="Earth-fixed globe. Arrow keys rotate. Plus and minus zoom.">
+          <canvas id="globe" tabindex="0" aria-label="Earth-fixed globe. Drag or use arrow keys to rotate. Plus and minus zoom.">
             This replay needs a browser with Canvas support.
           </canvas>
           <div class="frame-chip"><span class="frame-icon" aria-hidden="true">⊕</span> EARTH FIXED <span>ECEF</span></div>
@@ -39,14 +39,16 @@
             <button type="button" id="zoom-in" aria-label="Zoom in" title="Zoom in">+</button>
             <button type="button" id="zoom-out" aria-label="Zoom out" title="Zoom out">−</button>
             <button type="button" id="center" aria-label="Center on satellite" title="Center on satellite">⌖</button>
+            <button type="button" id="fit-all" aria-label="Fit all satellites" title="Fit all satellites">⊡</button>
           </div>
-          <div class="viewport-footer">
-            <div class="layers" aria-label="Globe layers">
-              <label title="Show orbital trajectory"><input id="orbit-layer" type="checkbox" checked><span class="legend-line"></span>Orbit</label>
-              <label title="Show projection onto Earth's surface"><input id="ground-layer" type="checkbox" checked><span class="legend-line dashed"></span>Ground track</label>
-            </div>
-            <span class="drag-hint">Drag to rotate</span>
+        </div>
+        <div class="viewport-footer">
+          <div class="layers" aria-label="Globe layers">
+            <label title="Show selected satellite's orbital trajectory"><input id="orbit-layer" type="checkbox" checked><span class="legend-line"></span>Selected orbit</label>
+            <label title="Show projection onto Earth's surface"><input id="ground-layer" type="checkbox" checked><span class="legend-line dashed"></span>Ground track</label>
+            <label title="Show satellites behind Earth as hollow markers"><input id="far-layer" type="checkbox" checked><span class="legend-dot"></span>Behind Earth</label>
           </div>
+          <span id="shown-count" class="shown-count"></span>
         </div>
 
         <div class="timeline">

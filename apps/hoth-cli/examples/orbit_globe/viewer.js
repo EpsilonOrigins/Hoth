@@ -10,6 +10,8 @@ const satellite = element("satellite");
 const playButton = element("play");
 const orbitLayer = element("orbit-layer");
 const groundLayer = element("ground-layer");
+const farLayer = element("far-layer");
+const shownCount = element("shown-count");
 const metersPerRadius = 6378137;
 const eccentricitySquared = 0.0066943799901413165;
 const rad = Math.PI / 180;
@@ -30,7 +32,6 @@ let playbackId = 0;
 let planetPixels;
 let cameraImageRevision = "";
 let path = [];
-let extent = 1.15;
 
 const disk = document.createElement("canvas");
 disk.width = disk.height = 620;
@@ -45,6 +46,17 @@ const activeTrack = () => replay.tracks[trackIndex];
 const currentState = () => activeTrack().states[frame];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const norm = ([x, y, z]) => Math.hypot(x, y, z);
+const extent = populationExtent();
+
+function populationExtent() {
+  let maxRadius = metersPerRadius;
+  for (const track of replay.tracks) {
+    for (const state of track.states) {
+      if (state) maxRadius = Math.max(maxRadius, norm(state));
+    }
+  }
+  return Math.max(1.15, maxRadius / metersPerRadius * 1.06);
+}
 
 function basis() {
   const s = Math.sin(longitude);
@@ -58,11 +70,11 @@ function basis() {
   };
 }
 
-function project([x, y, z], { right, up, forward }) {
+function project([x, y, z], { right, up, forward }, scale = 1) {
   return [
-    x * right[0] + y * right[1],
-    x * up[0] + y * up[1] + z * up[2],
-    x * forward[0] + y * forward[1] + z * forward[2],
+    (x * right[0] + y * right[1]) * scale,
+    (x * up[0] + y * up[1] + z * up[2]) * scale,
+    (x * forward[0] + y * forward[1] + z * forward[2]) * scale,
   ];
 }
 
@@ -219,7 +231,7 @@ function draw() {
   pen.fill();
   pen.fillStyle = "#163247";
   pen.beginPath();
-  pen.arc(cx, cy, radius - .3, 0, tau);
+  pen.arc(cx, cy, Math.max(0, radius - .3), 0, tau);
   pen.fill();
 
   paintDisk(camera);
@@ -231,8 +243,8 @@ function draw() {
   pen.arc(cx, cy, radius, 0, tau);
   pen.stroke();
 
-  const orbit = path.map((point) => point && project(point, camera));
   if (orbitLayer.checked) {
+    const orbit = path.map((point) => point && project(point, camera));
     pen.lineWidth = 1.4;
     pen.strokeStyle = "rgba(110, 239, 208, .46)";
     pen.setLineDash([4, 5]);
@@ -251,37 +263,51 @@ function draw() {
     pen.setLineDash([]);
   }
 
+  const frontMarkers = new Path2D();
+  const farMarkers = new Path2D();
+  const markerSize = replay.tracks.length > 1000 ? 1.6 : 2.7;
+  let plotted = 0;
+  let selected;
   for (const [i, track] of replay.tracks.entries()) {
     const state = track.states[frame];
-    if (!state || i === trackIndex) continue;
-    const point = project(state.slice(0, 3).map((value) => value / metersPerRadius), camera);
-    if (!visible(point)) continue;
-    pen.fillStyle = "rgba(189, 214, 238, .7)";
-    pen.beginPath();
-    pen.arc(cx + point[0] * radius, cy - point[1] * radius, 2.7, 0, tau);
-    pen.fill();
+    if (!state) continue;
+    const point = project(state, camera, 1 / metersPerRadius);
+    const foreground = visible(point);
+    if (!foreground && !farLayer.checked) continue;
+    const x = cx + point[0] * radius;
+    const y = cy - point[1] * radius;
+    if (x < 0 || x > width || y < 0 || y > height) continue;
+    plotted++;
+    if (i === trackIndex) {
+      selected = { x, y, foreground };
+      continue;
+    }
+    const markers = foreground ? frontMarkers : farMarkers;
+    markers.moveTo(x + markerSize, y);
+    markers.arc(x, y, markerSize, 0, tau);
   }
+  pen.lineWidth = 1;
+  pen.strokeStyle = "rgba(189, 214, 238, .60)";
+  pen.stroke(farMarkers);
+  pen.fillStyle = "rgba(189, 214, 238, .8)";
+  pen.fill(frontMarkers);
+  shownCount.textContent = `${plotted} / ${replay.tracks.length} plotted`;
 
-  const state = currentState();
-  if (!state) return;
-  const point = project(state.slice(0, 3).map((value) => value / metersPerRadius), camera);
-  if (!visible(point)) return;
-
-  const x = cx + point[0] * radius;
-  const y = cy - point[1] * radius;
+  if (!selected) return;
+  const { x, y, foreground } = selected;
   pen.fillStyle = "rgba(110, 239, 208, .20)";
   pen.beginPath();
   pen.arc(x, y, 12, 0, tau);
   pen.fill();
   pen.fillStyle = "#6eefd0";
-  pen.strokeStyle = "#eaffe9";
+  pen.strokeStyle = foreground ? "#eaffe9" : "#6eefd0";
   pen.lineWidth = 1.4;
   pen.beginPath();
   pen.arc(x, y, 5.6, 0, tau);
-  pen.fill();
+  if (foreground) pen.fill();
   pen.stroke();
 
-  const tag = `NORAD ${activeTrack().norad}`;
+  const tag = `NORAD ${activeTrack().norad}${foreground ? "" : " · behind Earth"}`;
   pen.font = "600 11px ui-monospace, monospace";
   const boxWidth = pen.measureText(tag).width + 16;
   const labelX = clamp(x + 14, 7, width - boxWidth - 7);
@@ -303,7 +329,6 @@ function requestPaint() {
 
 function loadTrack() {
   path = [];
-  extent = 1.15;
   const stride = Math.max(1, Math.ceil(activeTrack().states.length / 2400));
   for (const [i, state] of activeTrack().states.entries()) {
     if (!state) {
@@ -311,7 +336,6 @@ function loadTrack() {
       continue;
     }
     const point = state.slice(0, 3).map((value) => value / metersPerRadius);
-    extent = Math.max(extent, norm(point) * 1.06);
     if (i % stride === 0 || i === last || path.at(-1) === null) path.push(point);
   }
 
@@ -413,7 +437,7 @@ function moveCamera(dx, dy) {
 }
 
 function changeZoom(factor) {
-  zoom = clamp(zoom * factor, .42, 2.8);
+  zoom = clamp(zoom * factor, .42, Math.max(2.8, extent * 2));
   requestPaint();
 }
 
@@ -460,10 +484,15 @@ satellite.addEventListener("change", () => {
   setFrame(frame);
 });
 element("center").addEventListener("click", centerCamera);
+element("fit-all").addEventListener("click", () => {
+  zoom = 1;
+  requestPaint();
+});
 element("zoom-in").addEventListener("click", () => changeZoom(1.17));
 element("zoom-out").addEventListener("click", () => changeZoom(1 / 1.17));
 orbitLayer.addEventListener("change", requestPaint);
 groundLayer.addEventListener("change", requestPaint);
+farLayer.addEventListener("change", requestPaint);
 
 canvas.addEventListener("pointerdown", (event) => {
   if (pointer || event.button !== 0) return;

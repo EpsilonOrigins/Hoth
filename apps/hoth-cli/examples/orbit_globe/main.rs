@@ -16,7 +16,7 @@ use std::{
 const MAX_POINTS: u64 = 500_000;
 const DEFAULT_STEP_SECONDS: u64 = 15;
 const USAGE: &str =
-    "Usage: orbit_globe --manifest PATH --output PATH [--step-seconds 15] [--norad ID ...]";
+    "Usage: orbit_globe --manifest PATH --output PATH [--step-seconds SECONDS] [--norad ID ...]";
 
 #[derive(Serialize)]
 struct Replay {
@@ -37,13 +37,35 @@ struct Track {
     states: Vec<Option<[f64; 6]>>,
 }
 
-fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunResult<Replay> {
-    let config = manifest.config()?;
-    let duration = config.time.duration_seconds.get();
+fn sampling_plan(
+    duration: u64,
+    requested_step: Option<u64>,
+    satellite_count: u64,
+) -> RunResult<(u64, u64)> {
+    // Reserve slots for both endpoints. Increase the default interval before
+    // generating any states so large missions can preserve their membership.
+    let max_intervals = (MAX_POINTS / satellite_count).saturating_sub(1).max(1);
+    let step = requested_step.unwrap_or(DEFAULT_STEP_SECONDS.max(duration.div_ceil(max_intervals)));
     if step == 0 {
         return Err("--step-seconds must be positive".into());
     }
     let frame_count = duration.div_ceil(step) + 1;
+    let point_count = frame_count.saturating_mul(satellite_count);
+    if point_count > MAX_POINTS {
+        return Err(format!(
+            "export requires {point_count} points (limit {MAX_POINTS}); omit --step-seconds for automatic sampling, increase it, or select satellites with --norad"
+        ).into());
+    }
+    Ok((step, frame_count))
+}
+
+fn sample_mission(
+    manifest: &Manifest,
+    requested_step: Option<u64>,
+    ids: &BTreeSet<u32>,
+) -> RunResult<Replay> {
+    let config = manifest.config()?;
+    let duration = config.time.duration_seconds.get();
     let members = manifest.members();
     let selected: Vec<_> = members
         .iter()
@@ -57,12 +79,7 @@ fn sample_mission(manifest: &Manifest, step: u64, ids: &BTreeSet<u32>) -> RunRes
             .collect();
         return Err(format!("NORAD IDs absent from manifest: {missing:?}").into());
     }
-    let point_count = frame_count.saturating_mul(selected.len() as u64);
-    if point_count > MAX_POINTS {
-        return Err(format!(
-            "export requires {point_count} points (limit {MAX_POINTS}); increase --step-seconds or select satellites with --norad"
-        ).into());
-    }
+    let (step, frame_count) = sampling_plan(duration, requested_step, selected.len() as u64)?;
     let engine = Engine::new(
         selected
             .iter()
@@ -180,7 +197,7 @@ fn run() -> RunResult<()> {
     let manifest = manifest.ok_or("provide --manifest PATH")?;
     let output = output.ok_or("provide --output PATH")?;
     let manifest = Manifest::decode(&fs::read(manifest)?)?;
-    let replay = sample_mission(&manifest, step.unwrap_or(DEFAULT_STEP_SECONDS), &norad)?;
+    let replay = sample_mission(&manifest, step, &norad)?;
     write_replay(&output, &replay)?;
     println!(
         "Wrote {} ({} satellites, {} samples each)",
@@ -227,7 +244,7 @@ mod tests {
     #[test]
     fn samples_match_runtime_and_include_exact_end() {
         let manifest = fixture();
-        let replay = sample_mission(&manifest, 15, &BTreeSet::new()).unwrap();
+        let replay = sample_mission(&manifest, None, &BTreeSet::new()).unwrap();
         assert_eq!(replay.offsets, [0, 15, 30, 41]);
         let engine = Engine::load(&manifest).unwrap();
         assert_eq!(replay.tracks[0].norad, 25544);
@@ -243,7 +260,17 @@ mod tests {
                 Some(&states[0].provenance)
             );
         }
-        assert!(sample_mission(&manifest, 15, &BTreeSet::from([9])).is_err());
-        assert!(sample_mission(&manifest, 0, &BTreeSet::new()).is_err());
+        assert!(sample_mission(&manifest, Some(15), &BTreeSet::from([9])).is_err());
+        assert!(sample_mission(&manifest, Some(0), &BTreeSet::new()).is_err());
+    }
+
+    #[test]
+    fn automatic_sampling_keeps_large_populations_within_budget() {
+        assert_eq!(sampling_plan(5700, None, 100).unwrap(), (15, 381));
+        assert_eq!(sampling_plan(5700, None, 15_000).unwrap(), (179, 33));
+        assert_eq!(sampling_plan(5700, None, 50_000).unwrap(), (634, 10));
+        assert_eq!(sampling_plan(5700, Some(10), 100).unwrap(), (10, 571));
+        let error = sampling_plan(5700, Some(15), 15_000).unwrap_err();
+        assert!(error.to_string().contains("limit 500000"));
     }
 }

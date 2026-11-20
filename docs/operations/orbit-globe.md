@@ -10,9 +10,9 @@ From the repository root:
 bash scripts/orbit-globe.sh
 ```
 
-Open the printed HTML path. The default fixture includes 100 manifest members and the viewer shows four selected satellites for 95 minutes at 15-second sample intervals. The script uses a temporary catalog and manifest. A repeat run creates a fresh report path.
+Open the printed HTML path. The demo shows all 100 satellites together on a 95-minute timeline with 15-second sample intervals. The script uses a temporary catalog and manifest. A repeat run creates a fresh report path.
 
-For browsers that restrict local file URLs, serve the report directory on loopback with `python3 -m http.server 8020 --bind 127.0.0.1 --directory data` and open `http://127.0.0.1:8020/orbit-globe.html`.
+For browsers that restrict local file URLs, serve the report directory on loopback with `python3 -m http.server 8020 --bind 127.0.0.1 --directory data` and open the printed path under `http://127.0.0.1:8020`. For example, open `http://127.0.0.1:8020/orbit-globe.html` for `data/orbit-globe.html`.
 
 ## Use your own scenario
 
@@ -24,13 +24,13 @@ bash scripts/orbit-globe.sh \
   --step-seconds 10 --norad 25544
 ```
 
-Repeat `--norad` to include multiple satellites. Omitting it includes every satellite in the manifest. The report always samples the mission start and exact mission end. For reports above 500,000 total satellite samples, increase `--step-seconds` or select fewer satellites. Each export writes to a new path.
+Omit `--norad` to include every satellite in the manifest. Repeat it to export a subset. The report always samples the mission start and exact mission end. The default interval is 15 seconds and increases automatically for larger missions to fit within 500,000 total satellite samples. If you set an explicit interval and hit that limit, increase `--step-seconds` or omit it for automatic sampling. Each export writes to a new path.
 
 ## Inspect an orbit
 
-- Select a NORAD ID and scrub the simulation UTC timeline. Use the arrow buttons for single-sample steps.
-- Drag the globe to rotate it, use the mouse wheel or the zoom buttons to zoom, and use the centering button to find the selected satellite.
-- Use the orbit and ground-track checkboxes to isolate the two paths. Dim orbit segments show parts of the trajectory behind Earth. Unavailable propagation samples appear as gaps.
+- Scrub the UTC timeline to move all satellites together. Hollow markers indicate satellites behind Earth. Uncheck **Behind Earth** to hide those markers. The plotted count reflects the current view and any unavailable states.
+- Drag to rotate the globe and use the wheel or zoom buttons to zoom. Use **Fit all satellites** to restore the scale for the full population after zooming.
+- Select a NORAD ID to highlight its marker and inspect its trajectory. The centering button points the globe at that satellite. The orbit and ground-track checkboxes control its two paths. Dim orbit segments show parts of the trajectory behind Earth. Unavailable propagation samples appear as gaps.
 - Read the canonical ECEF vectors and source epoch in the inspector. Download CSV for the selected satellite's full sampled series, with position in meters and velocity in meters per second.
 
 HOTH propagates each sample with the same engine used for telemetry publishing. The display connects sample points and projects the ground track radially onto a spherical globe. The inspector computes geodetic coordinates with the WGS 84 ellipsoid. Synthetic initialization is marked in the source provenance. [Earth texture attribution](../../apps/hoth-cli/examples/orbit_globe/earth.LICENSE)
